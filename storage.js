@@ -291,6 +291,36 @@ async function hasPendingMigration() {
   return old.weightLogs.length > 0 || old.mealLogs.length > 0;
 }
 
+// ── Profile ────────────────────────────────────────────────────────────────
+// Profile fields are stored inside the existing settings/preferences document.
+
+async function getProfile() {
+  const s = await getAllSettings();
+  return {
+    displayName:   s.displayName   || '',
+    dob:           s.dob           || '',
+    gender:        s.gender        || 'male',
+    heightCm:      Number(s.heightCm)   || 0,
+    goalWeight:    Number(s.goalWeight) || 0,
+    activityLevel: s.activityLevel || 'moderate',
+    goalType:      s.goalType      || 'maintain',
+  };
+}
+
+async function saveProfile(profile) {
+  // Merge into the single preferences document
+  await userCol('settings').doc('preferences').set(profile, { merge: true });
+  // Mirror the display name into Firebase Auth so navbar shows it immediately
+  try {
+    const user = FirebaseAuth.auth.currentUser;
+    if (user && profile.displayName) {
+      await user.updateProfile({ displayName: profile.displayName });
+    }
+  } catch (e) {
+    console.warn('Could not sync displayName to Firebase Auth:', e);
+  }
+}
+
 // ── Public API ─────────────────────────────────────────────────────────────
 // init() is a no-op — Firestore is initialized by auth.js.
 // The same API surface is preserved so existing page code needs minimal changes.
@@ -305,6 +335,8 @@ window.Storage = {
   getAllFoods, addFood, updateFood, deleteFood, getFoodById, searchFoods,
   // Settings
   getSetting, setSetting, getAllSettings,
+  // Profile
+  getProfile, saveProfile,
   // Data management
   exportAllData, importAllData, seedDefaultFoods,
   migrateFromIndexedDB, hasPendingMigration,

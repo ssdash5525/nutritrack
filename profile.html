@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NutriTrack — Profile</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+</head>
+<body class="body-padded">
+
+  <nav class="navbar">
+    <a href="index.html" class="nav-brand">Nutri<span>Track</span></a>
+    <button class="nav-toggle" id="nav-toggle"><span></span><span></span><span></span></button>
+    <div class="nav-menu" id="nav-menu">
+      <a href="index.html"    class="nav-link"><span class="nav-icon">⊞</span> Dashboard</a>
+      <a href="weight.html"   class="nav-link"><span class="nav-icon">⚖</span> Weight</a>
+      <a href="meals.html"    class="nav-link"><span class="nav-icon">🍽</span> Meals</a>
+      <a href="analysis.html" class="nav-link"><span class="nav-icon">📊</span> Analysis</a>
+      <a href="food-db.html"  class="nav-link"><span class="nav-icon">🥗</span> Food DB</a>
+      <a href="profile.html"  class="nav-link"><span class="nav-icon">👤</span> Profile</a>
+    </div>
+    <div class="nav-actions nav-user">
+      <span class="nav-user-email" id="nav-user-email"></span>
+      <button class="btn-icon" id="theme-toggle" title="Toggle theme">☾</button>
+      <button class="btn btn-secondary btn-sm" onclick="FirebaseAuth.signOut()">Logout</button>
+    </div>
+  </nav>
+
+  <div id="toast-container"></div>
+
+  <main class="main-content">
+    <div class="page-header flex-between flex-wrap">
+      <div>
+        <h1 class="page-title">My Profile</h1>
+        <p class="page-subtitle">Your details power calorie targets and health calculations across the app</p>
+      </div>
+      <button class="btn btn-primary" id="btn-save-profile">Save Profile</button>
+    </div>
+
+    <div class="grid-2">
+
+      <!-- ── Left: Form ───────────────────────────────────────────── -->
+      <div class="card">
+
+        <p class="profile-section-title">Personal Information</p>
+
+        <div class="form-group">
+          <label for="p-name">Display Name</label>
+          <input type="text" id="p-name" placeholder="Your name" maxlength="60" />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="p-dob">Date of Birth</label>
+            <input type="date" id="p-dob" />
+          </div>
+          <div class="form-group">
+            <label for="p-gender">Sex <span class="text-muted text-sm">(for BMR calc)</span></label>
+            <select id="p-gender">
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="p-height">Height (cm)</label>
+          <input type="number" id="p-height" min="50" max="300" step="0.5" placeholder="e.g. 175" />
+          <div class="input-hint">Used to calculate BMI and BMR</div>
+        </div>
+
+        <p class="profile-section-title">Goals</p>
+
+        <div class="form-group">
+          <label for="p-goal-weight">Goal Weight (kg)</label>
+          <input type="number" id="p-goal-weight" min="20" max="500" step="0.1" placeholder="e.g. 70" />
+          <div class="input-hint">Shown as a target line on your weight chart</div>
+        </div>
+
+        <div class="form-group">
+          <label for="p-activity">Activity Level</label>
+          <select id="p-activity">
+            <option value="sedentary">Sedentary — desk job, little to no exercise</option>
+            <option value="light">Lightly Active — light exercise 1–3 days/week</option>
+            <option value="moderate" selected>Moderately Active — moderate exercise 3–5 days/week</option>
+            <option value="very">Very Active — hard exercise 6–7 days/week</option>
+            <option value="extreme">Extremely Active — physical job + hard training</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="p-goal">Weight Goal</label>
+          <select id="p-goal">
+            <option value="lose">Lose Weight — eat 500 kcal below TDEE (~0.5 kg/week)</option>
+            <option value="maintain" selected>Maintain Weight — eat at TDEE</option>
+            <option value="gain">Gain Weight — eat 300 kcal above TDEE</option>
+          </select>
+        </div>
+
+        <!-- Live preview as user types -->
+        <div id="profile-live-preview" class="hidden mt-2">
+          <div class="info-box" id="profile-preview-text"></div>
+        </div>
+
+      </div>
+
+      <!-- ── Right: Calculated Stats ───────────────────────────────── -->
+      <div>
+
+        <!-- Current metrics card -->
+        <div class="card mb-3" id="calc-card">
+          <h3 class="card-title">Your Calculated Metrics</h3>
+
+          <div id="calc-placeholder" class="empty-state" style="padding:1.5rem 0">
+            <div class="empty-state-icon">🧮</div>
+            <div class="empty-state-title">Fill in your details</div>
+            <div class="empty-state-desc">Save your profile to see BMR, TDEE, and recommended calorie target</div>
+          </div>
+
+          <div id="calc-results" class="hidden">
+            <div class="calc-stat">
+              <div>
+                <div class="calc-stat-label">Current Weight</div>
+                <div class="calc-stat-sub">(from latest log)</div>
+              </div>
+              <div class="calc-stat-value" id="calc-cur-weight">—</div>
+            </div>
+            <div class="calc-stat">
+              <div>
+                <div class="calc-stat-label">BMI</div>
+                <div class="calc-stat-sub">Body Mass Index</div>
+              </div>
+              <div>
+                <span class="calc-stat-value" id="calc-bmi">—</span>
+                <span class="bmi-badge" id="calc-bmi-badge"></span>
+              </div>
+            </div>
+            <div class="calc-stat">
+              <div>
+                <div class="calc-stat-label">BMR</div>
+                <div class="calc-stat-sub">Calories burned at rest</div>
+              </div>
+              <div class="calc-stat-value" id="calc-bmr">—</div>
+            </div>
+            <div class="calc-stat">
+              <div>
+                <div class="calc-stat-label">TDEE</div>
+                <div class="calc-stat-sub">Total daily energy expenditure</div>
+              </div>
+              <div class="calc-stat-value" id="calc-tdee">—</div>
+            </div>
+            <div class="calc-stat">
+              <div>
+                <div class="calc-stat-label">Calorie Target</div>
+                <div class="calc-stat-sub" id="calc-target-sub">Based on your goal</div>
+              </div>
+              <div class="calc-stat-value" style="color:var(--primary)" id="calc-target">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Goal weight progress -->
+        <div class="card mb-3" id="goal-progress-card">
+          <h3 class="card-title">Goal Progress</h3>
+          <div id="goal-progress-content">
+            <div class="text-muted text-sm">Set a goal weight and log your weight to track progress here.</div>
+          </div>
+        </div>
+
+        <!-- Info boxes -->
+        <div class="card">
+          <h3 class="card-title" style="margin-bottom:0.75rem">How it works</h3>
+          <div class="info-box mb-2">
+            <strong>BMR — Basal Metabolic Rate</strong>
+            Calories your body burns just to stay alive (sleeping, breathing). Calculated with the Mifflin-St Jeor equation using your weight, height, age, and sex.
+          </div>
+          <div class="info-box mb-2">
+            <strong>TDEE — Total Daily Energy Expenditure</strong>
+            BMR × your activity multiplier. This is how many calories you burn in a typical day including exercise.
+          </div>
+          <div class="info-box">
+            <strong>Calorie Target</strong>
+            TDEE adjusted for your goal: −500 kcal to lose ~0.5 kg/week, +300 kcal to slowly gain. This is automatically applied across the app when you save.
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <script src="auth.js"></script>
+  <script src="storage.js"></script>
+  <script src="app.js"></script>
+  <script>
+    let latestWeight = null;
+
+    FirebaseAuth.requireAuth().then(async (user) => {
+      document.getElementById('nav-user-email').textContent = user.displayName || user.email;
+
+      const [profile, weightLogs] = await Promise.all([
+        Storage.getProfile(),
+        Storage.getAllWeightLogs(),
+      ]);
+
+      latestWeight = weightLogs.length ? weightLogs[weightLogs.length - 1].weight : null;
+
+      // Populate form
+      document.getElementById('p-name').value        = profile.displayName   || user.displayName || '';
+      document.getElementById('p-dob').value         = profile.dob           || '';
+      document.getElementById('p-gender').value      = profile.gender        || 'male';
+      document.getElementById('p-height').value      = profile.heightCm      || '';
+      document.getElementById('p-goal-weight').value = profile.goalWeight    || '';
+      document.getElementById('p-activity').value    = profile.activityLevel || 'moderate';
+      document.getElementById('p-goal').value        = profile.goalType      || 'maintain';
+
+      // Show calculations if we have enough data
+      if (profile.heightCm && profile.dob) {
+        updateCalcPanel(profile);
+      }
+
+      updateGoalProgress(profile);
+
+      // Live preview on any change
+      ['p-dob','p-gender','p-height','p-activity','p-goal'].forEach(id => {
+        document.getElementById(id).addEventListener('change', livePreview);
+      });
+      document.getElementById('p-height').addEventListener('input', livePreview);
+    });
+
+    function livePreview() {
+      const dob      = document.getElementById('p-dob').value;
+      const gender   = document.getElementById('p-gender').value;
+      const height   = parseFloat(document.getElementById('p-height').value);
+      const activity = document.getElementById('p-activity').value;
+      const goal     = document.getElementById('p-goal').value;
+
+      if (!dob || !height || !latestWeight) return;
+
+      const age   = App.calcAge(dob);
+      const bmr   = App.calcBMR(latestWeight, height, age, gender);
+      const tdee  = App.calcTDEE(bmr, activity);
+      const target = App.calcCalorieTarget(tdee, goal);
+
+      if (!target) return;
+
+      const goalLabels = { lose: 'lose weight', maintain: 'maintain', gain: 'gain weight' };
+      document.getElementById('profile-preview-text').textContent =
+        `Based on your inputs: BMR ${bmr} kcal → TDEE ${tdee} kcal → Target ${target} kcal/day to ${goalLabels[goal]}.`;
+      document.getElementById('profile-live-preview').classList.remove('hidden');
+    }
+
+    function updateCalcPanel(profile) {
+      if (!latestWeight || !profile.heightCm || !profile.dob) return;
+
+      const age    = App.calcAge(profile.dob);
+      if (!age) return;
+
+      const bmr    = App.calcBMR(latestWeight, profile.heightCm, age, profile.gender);
+      const tdee   = App.calcTDEE(bmr, profile.activityLevel);
+      const target = App.calcCalorieTarget(tdee, profile.goalType);
+      const bmi    = App.calcBMI(latestWeight, profile.heightCm);
+      const cat    = App.bmiCategory(bmi);
+
+      document.getElementById('calc-placeholder').classList.add('hidden');
+      document.getElementById('calc-results').classList.remove('hidden');
+
+      document.getElementById('calc-cur-weight').textContent = latestWeight + ' kg';
+      document.getElementById('calc-bmi').textContent        = bmi || '—';
+      document.getElementById('calc-bmr').textContent        = bmr  ? bmr  + ' kcal' : '—';
+      document.getElementById('calc-tdee').textContent       = tdee ? tdee + ' kcal' : '—';
+      document.getElementById('calc-target').textContent     = target ? target + ' kcal' : '—';
+
+      const goalSubs = {
+        lose:     'TDEE − 500 kcal (lose ~0.5 kg/week)',
+        maintain: 'Equal to TDEE',
+        gain:     'TDEE + 300 kcal',
+      };
+      document.getElementById('calc-target-sub').textContent = goalSubs[profile.goalType] || 'Based on your goal';
+
+      if (cat) {
+        const badge = document.getElementById('calc-bmi-badge');
+        badge.textContent = cat.label;
+        badge.style.background = cat.color + '22';
+        badge.style.color      = cat.color;
+      }
+    }
+
+    function updateGoalProgress(profile) {
+      const container = document.getElementById('goal-progress-content');
+      if (!latestWeight || !profile.goalWeight || !profile.heightCm) {
+        container.innerHTML = '<div class="text-muted text-sm">Set a goal weight and log your weight to see progress here.</div>';
+        return;
+      }
+
+      const current = latestWeight;
+      const goal    = profile.goalWeight;
+      const diff    = App.round2(current - goal);
+      const diffText = diff === 0 ? '🎉 Goal reached!'
+                     : diff > 0  ? `${diff} kg above goal`
+                     : `${Math.abs(diff)} kg below goal`;
+
+      // Progress: for losing, start = first logged weight or current; for gaining, inverse
+      const isLosing = profile.goalType === 'lose';
+      let pct;
+      if (isLosing) {
+        // How far from start to goal; clamp 0-100
+        pct = Math.min(100, Math.max(0, ((current - goal) / current) * 100));
+        // Actually show how much progress made toward goal
+        pct = diff <= 0 ? 100 : Math.max(0, Math.min(100, 100 - (diff / (current - goal + 0.01)) * 100));
+      } else {
+        pct = Math.min(100, (current / goal) * 100);
+      }
+      pct = Math.round(pct);
+
+      const color = diff === 0 ? 'var(--success)' : 'var(--primary)';
+
+      container.innerHTML = `
+        <div class="goal-progress-row">
+          <span>Current: <strong>${current} kg</strong></span>
+          <span>Goal: <strong>${goal} kg</strong></span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" style="width:${pct}%;background:${color}"></div>
+        </div>
+        <div class="flex-between mt-1">
+          <span class="text-muted text-sm">${diffText}</span>
+          <span class="text-muted text-sm">${pct}%</span>
+        </div>
+      `;
+    }
+
+    // ── Save ────────────────────────────────────────────────────────────────
+
+    document.getElementById('btn-save-profile').addEventListener('click', async () => {
+      const name      = document.getElementById('p-name').value.trim();
+      const dob       = document.getElementById('p-dob').value;
+      const gender    = document.getElementById('p-gender').value;
+      const heightCm  = parseFloat(document.getElementById('p-height').value) || 0;
+      const goalWeight = parseFloat(document.getElementById('p-goal-weight').value) || 0;
+      const activityLevel = document.getElementById('p-activity').value;
+      const goalType  = document.getElementById('p-goal').value;
+
+      const profile = { displayName: name, dob, gender, heightCm, goalWeight, activityLevel, goalType };
+
+      // Calculate and save calorie target automatically
+      if (latestWeight && heightCm && dob) {
+        const age    = App.calcAge(dob);
+        const bmr    = App.calcBMR(latestWeight, heightCm, age, gender);
+        const tdee   = App.calcTDEE(bmr, activityLevel);
+        const target = App.calcCalorieTarget(tdee, goalType);
+        if (target) profile.calorieTarget = target;
+      }
+
+      const btn = document.getElementById('btn-save-profile');
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+
+      try {
+        await Storage.saveProfile(profile);
+
+        // Refresh display
+        document.getElementById('nav-user-email').textContent = name || FirebaseAuth.auth.currentUser.email;
+        updateCalcPanel(profile);
+        updateGoalProgress(profile);
+        document.getElementById('profile-live-preview').classList.add('hidden');
+
+        App.showToast('Profile saved! Calorie target updated across the app.');
+      } catch (err) {
+        App.showToast('Save failed: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Profile';
+      }
+    });
+  </script>
+</body>
+</html>

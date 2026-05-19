@@ -1,8 +1,15 @@
 /**
  * NutriTrack - Firebase Auth Module
  * Initializes Firebase, exposes auth helpers used by every page.
+ *
+ * NOTE: The Firebase API key below is intentionally public — this is by design.
+ * Firebase Web API keys are not secrets; they identify your Firebase project and
+ * are safe to commit. Security is enforced by Firestore Security Rules on the
+ * server side, not by hiding this key. See:
+ * https://firebase.google.com/docs/projects/api-keys#api-keys-for-firebase-are-different
  */
 
+// firebase-api-key-public: intentional — not a secret, required in client code
 const firebaseConfig = {
   apiKey:            "AIzaSyAQ0uZOVsdG-Csn0bi1J6hhIaIzOsVpUq0",
   authDomain:        "nutritrack-cb4b0.firebaseapp.com",

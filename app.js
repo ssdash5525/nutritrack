@@ -224,6 +224,65 @@ function initNavToggle() {
   }
 }
 
+// ── Body / Health Calculations ────────────────────────────────────────────────
+
+const ACTIVITY_MULTIPLIERS = {
+  sedentary: 1.2,
+  light:     1.375,
+  moderate:  1.55,
+  very:      1.725,
+  extreme:   1.9,
+};
+
+function calcAge(dob) {
+  if (!dob) return null;
+  const today = new Date();
+  const birth = new Date(dob + 'T00:00:00');
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age > 0 ? age : null;
+}
+
+// Mifflin-St Jeor equation
+function calcBMR(weightKg, heightCm, age, gender) {
+  if (!weightKg || !heightCm || !age) return null;
+  const base = 10 * weightKg + 6.25 * heightCm - 5 * age;
+  return Math.round(gender === 'female' ? base - 161 : base + 5);
+}
+
+function calcTDEE(bmr, activityLevel) {
+  if (!bmr) return null;
+  return Math.round(bmr * (ACTIVITY_MULTIPLIERS[activityLevel] || 1.55));
+}
+
+function calcCalorieTarget(tdee, goalType) {
+  if (!tdee) return null;
+  if (goalType === 'lose') return Math.max(1200, tdee - 500);
+  if (goalType === 'gain') return tdee + 300;
+  return tdee;
+}
+
+function calcBMI(weightKg, heightCm) {
+  if (!weightKg || !heightCm) return null;
+  return round2(weightKg / Math.pow(heightCm / 100, 2));
+}
+
+function bmiCategory(bmi) {
+  if (!bmi) return null;
+  if (bmi < 18.5) return { label: 'Underweight', color: 'var(--secondary)' };
+  if (bmi < 25)   return { label: 'Normal',      color: 'var(--success)'   };
+  if (bmi < 30)   return { label: 'Overweight',  color: 'var(--warning)'   };
+  return               { label: 'Obese',       color: 'var(--danger)'    };
+}
+
+function timeGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -243,4 +302,7 @@ window.App = {
   renderProgressBar,
   downloadCSV, downloadJSON,
   confirmAction,
+  // Health calculations
+  calcAge, calcBMR, calcTDEE, calcCalorieTarget, calcBMI, bmiCategory,
+  timeGreeting, ACTIVITY_MULTIPLIERS,
 };

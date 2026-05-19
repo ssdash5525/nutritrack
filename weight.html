@@ -23,6 +23,7 @@
       <a href="meals.html"    class="nav-link"><span class="nav-icon">🍽</span> Meals</a>
       <a href="analysis.html" class="nav-link"><span class="nav-icon">📊</span> Analysis</a>
       <a href="food-db.html"  class="nav-link"><span class="nav-icon">🥗</span> Food DB</a>
+      <a href="profile.html"  class="nav-link"><span class="nav-icon">👤</span> Profile</a>
     </div>
     <div class="nav-actions nav-user">
       <span class="nav-user-email" id="nav-user-email"></span>
@@ -102,7 +103,7 @@
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>Date</th><th>Weight (kg)</th><th>Change</th><th>Notes</th><th></th></tr>
+            <tr><th>Date</th><th>Weight (kg)</th><th>BMI</th><th>Change</th><th>Notes</th><th></th></tr>
           </thead>
           <tbody id="weight-table-body">
             <tr><td colspan="5" class="table-empty">Loading…</td></tr>
@@ -151,8 +152,11 @@
   <script>
     let allLogs = [];
 
+    let userProfile = {};
+
     FirebaseAuth.requireAuth().then(async (user) => {
-      document.getElementById('nav-user-email').textContent = user.email;
+      document.getElementById('nav-user-email').textContent = user.displayName || user.email;
+      userProfile = await Storage.getProfile();
       await loadLogs();
     });
 
@@ -192,7 +196,7 @@
         data = data.filter(l => l.date >= cutStr);
       }
 
-      Charts.renderWeightChart('chart-weight', data.map(l => App.formatDate(l.date)), data.map(l => l.weight));
+      Charts.renderWeightChart('chart-weight', data.map(l => App.formatDate(l.date)), data.map(l => l.weight), userProfile.goalWeight || null);
     }
 
     function renderTable() {
@@ -200,7 +204,7 @@
       document.getElementById('entry-count').textContent = `${allLogs.length} entries`;
 
       if (!allLogs.length) {
-        tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No weight entries yet. Click "Log Weight" to start.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="table-empty">No weight entries yet. Click "Log Weight" to start.</td></tr>';
         return;
       }
 
@@ -213,9 +217,15 @@
           change = (diff >= 0 ? '+' : '') + diff + ' kg';
           changeClass = diff > 0 ? 'text-danger' : diff < 0 ? 'text-success' : '';
         }
+        const bmi = userProfile.heightCm ? App.calcBMI(log.weight, userProfile.heightCm) : null;
+        const cat = bmi ? App.bmiCategory(bmi) : null;
+        const bmiCell = bmi
+          ? `<span style="font-weight:600">${bmi}</span> <span class="text-sm" style="color:${cat.color}">${cat.label}</span>`
+          : '<span class="text-muted">—</span>';
         return `<tr>
           <td>${App.formatDateLong(log.date)}</td>
           <td><strong>${log.weight} kg</strong></td>
+          <td>${bmiCell}</td>
           <td class="${changeClass}">${change}</td>
           <td class="text-muted text-sm">${log.notes || '—'}</td>
           <td>

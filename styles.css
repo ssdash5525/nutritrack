@@ -968,3 +968,65 @@ tbody tr:hover { background: var(--bg-hover); }
 }
 .migration-banner-info strong { color: var(--warning); }
 .migration-banner-info p { font-size: 0.82rem; margin-top: 0.1rem; }
+
+/* ── Profile Page ─────────────────────────────────────────────────────────── */
+.profile-section-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--primary);
+  margin: 1.5rem 0 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+.profile-section-title:first-child { margin-top: 0; }
+
+.calc-stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.calc-stat:last-child { border-bottom: none; }
+.calc-stat-label { font-size: 0.82rem; color: var(--text-muted); font-weight: 500; }
+.calc-stat-value { font-size: 1.05rem; font-weight: 700; color: var(--text); }
+.calc-stat-sub   { font-size: 0.72rem; color: var(--text-muted); }
+
+.bmi-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.goal-progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+}
+
+.activity-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.activity-option-label { font-weight: 600; }
+.activity-option-desc  { font-size: 0.75rem; color: var(--text-muted); }
+
+.info-box {
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  padding: 0.9rem 1rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.info-box strong { color: var(--text); display: block; margin-bottom: 0.2rem; }

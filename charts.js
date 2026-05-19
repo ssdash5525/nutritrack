@@ -78,28 +78,39 @@ function destroyChart(canvasId) {
 
 // ── Weight Line Chart ─────────────────────────────────────────────────────────
 
-function renderWeightChart(canvasId, labels, data) {
+function renderWeightChart(canvasId, labels, data, goalWeight) {
   destroyChart(canvasId);
   const ctx = document.getElementById(canvasId).getContext('2d');
   const opts = baseOptions('Weight Trend');
 
-  // Remove scale definitions that conflict with line chart (no pie scales)
+  const datasets = [{
+    label: 'Weight (kg)',
+    data,
+    borderColor: ChartDefaults.colors.primary,
+    backgroundColor: 'rgba(79,70,229,0.10)',
+    pointBackgroundColor: ChartDefaults.colors.primary,
+    pointRadius: 5,
+    pointHoverRadius: 7,
+    fill: true,
+    tension: 0.35,
+  }];
+
+  if (goalWeight) {
+    datasets.push({
+      label: `Goal (${goalWeight} kg)`,
+      data: Array(labels.length).fill(goalWeight),
+      borderColor: ChartDefaults.colors.success,
+      borderDash: [6, 3],
+      borderWidth: 2,
+      pointRadius: 0,
+      fill: false,
+      tension: 0,
+    });
+  }
+
   new Chart(ctx, {
     type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Weight (kg)',
-        data,
-        borderColor: ChartDefaults.colors.primary,
-        backgroundColor: 'rgba(79,70,229,0.10)',
-        pointBackgroundColor: ChartDefaults.colors.primary,
-        pointRadius: 5,
-        pointHoverRadius: 7,
-        fill: true,
-        tension: 0.35,
-      }],
-    },
+    data: { labels, datasets },
     options: {
       ...opts,
       plugins: {
