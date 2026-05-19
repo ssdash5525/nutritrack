@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NutriTrack — Nutrition Analysis</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .nutrition-table td:first-child { font-weight:500; }
+    .nutrition-table .sub-row td:first-child { padding-left:2rem; color:var(--text-muted); font-weight:400; font-size:0.82rem; }
+    .settings-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:1rem; }
+  </style>
+</head>
+<body class="body-padded">
+
+  <nav class="navbar">
+    <a href="index.html" class="nav-brand">Nutri<span>Track</span></a>
+    <button class="nav-toggle" id="nav-toggle"><span></span><span></span><span></span></button>
+    <div class="nav-menu" id="nav-menu">
+      <a href="index.html"    class="nav-link"><span class="nav-icon">⊞</span> Dashboard</a>
+      <a href="weight.html"   class="nav-link"><span class="nav-icon">⚖</span> Weight</a>
+      <a href="meals.html"    class="nav-link"><span class="nav-icon">🍽</span> Meals</a>
+      <a href="analysis.html" class="nav-link"><span class="nav-icon">📊</span> Analysis</a>
+      <a href="food-db.html"  class="nav-link"><span class="nav-icon">🥗</span> Food DB</a>
+    </div>
+    <div class="nav-actions nav-user">
+      <span class="nav-user-email" id="nav-user-email"></span>
+      <button class="btn-icon" id="theme-toggle" title="Toggle theme">☾</button>
+      <button class="btn btn-secondary btn-sm" onclick="FirebaseAuth.signOut()">Logout</button>
+    </div>
+  </nav>
+
+  <div id="toast-container"></div>
+
+  <main class="main-content">
+    <div class="page-header flex-between flex-wrap">
+      <div>
+        <h1 class="page-title">Nutrition Analysis</h1>
+        <p class="page-subtitle">Detailed breakdown of your nutrition</p>
+      </div>
+      <div class="flex flex-wrap" style="gap:0.75rem">
+        <div class="date-nav">
+          <button class="date-nav-btn" id="btn-prev-day">‹</button>
+          <input type="date" id="analysis-date" />
+          <button class="date-nav-btn" id="btn-next-day">›</button>
+          <button class="date-nav-btn" id="btn-today" style="font-size:0.75rem;padding:0 6px;width:auto">Today</button>
+        </div>
+        <button class="btn btn-secondary" id="btn-export-report">⬇ Export JSON</button>
+      </div>
+    </div>
+
+    <!-- Calorie Targets -->
+    <div class="card mb-3">
+      <div class="section-header">
+        <h3 class="card-title" style="margin:0">Calorie Targets</h3>
+        <button class="btn btn-primary btn-sm" id="btn-save-targets">Save Targets</button>
+      </div>
+      <div class="settings-grid">
+        <div class="form-group"><label>Daily Target (kcal)</label><input type="number" id="target-daily"     min="500" max="10000" placeholder="2000" /></div>
+        <div class="form-group"><label>Breakfast (kcal)</label>  <input type="number" id="target-breakfast"  min="0"   max="5000"  placeholder="Optional" /></div>
+        <div class="form-group"><label>Lunch (kcal)</label>      <input type="number" id="target-lunch"      min="0"   max="5000"  placeholder="Optional" /></div>
+        <div class="form-group"><label>Snacks (kcal)</label>     <input type="number" id="target-snacks"     min="0"   max="5000"  placeholder="Optional" /></div>
+        <div class="form-group"><label>Dinner (kcal)</label>     <input type="number" id="target-dinner"     min="0"   max="5000"  placeholder="Optional" /></div>
+      </div>
+    </div>
+
+    <!-- Progress + Pie -->
+    <div class="grid-2 mb-3">
+      <div class="card">
+        <h3 class="card-title">Daily Calorie Progress</h3>
+        <div id="bar-daily-total" class="mb-2"></div>
+        <hr class="divider" />
+        <div id="bar-breakfast" class="mb-1"></div>
+        <div id="bar-lunch"     class="mb-1"></div>
+        <div id="bar-snacks"    class="mb-1"></div>
+        <div id="bar-dinner"></div>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Macro Distribution</h3>
+        <div class="chart-container"><canvas id="chart-macro-pie"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <h3 class="card-title">Calories by Meal</h3>
+      <div class="chart-container"><canvas id="chart-meal-bars"></canvas></div>
+    </div>
+
+    <div class="card mb-3">
+      <h3 class="card-title">Macros by Meal</h3>
+      <div class="chart-container"><canvas id="chart-macro-bars"></canvas></div>
+    </div>
+
+    <!-- Detailed table -->
+    <div class="card mb-3">
+      <h3 class="card-title">Detailed Nutrition Breakdown</h3>
+      <div class="table-wrap">
+        <table class="nutrition-table">
+          <thead>
+            <tr><th>Food / Meal</th><th>Qty (g)</th><th>Calories</th><th>Protein</th><th>Carbs</th><th>Fats</th><th>Fiber</th></tr>
+          </thead>
+          <tbody id="nutrition-table-body">
+            <tr><td colspan="7" class="table-empty">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="card-title">7-Day Calorie Trend</h3>
+      <div class="chart-container-lg"><canvas id="chart-trend"></canvas></div>
+    </div>
+  </main>
+
+  <script src="auth.js"></script>
+  <script src="storage.js"></script>
+  <script src="app.js"></script>
+  <script src="charts.js"></script>
+  <script>
+    let currentDate = App.todayISO();
+    let targets     = {};
+
+    FirebaseAuth.requireAuth().then(async (user) => {
+      document.getElementById('nav-user-email').textContent = user.email;
+      document.getElementById('analysis-date').value = currentDate;
+      await loadTargets();
+      await loadAnalysis();
+      await load7DayTrend();
+      setupDateNav();
+    });
+
+    function setupDateNav() {
+      document.getElementById('analysis-date').addEventListener('change', async (e) => { currentDate = e.target.value; await loadAnalysis(); });
+      document.getElementById('btn-prev-day').addEventListener('click', () => changeDay(-1));
+      document.getElementById('btn-next-day').addEventListener('click', () => changeDay(1));
+      document.getElementById('btn-today').addEventListener('click', async () => {
+        currentDate = App.todayISO();
+        document.getElementById('analysis-date').value = currentDate;
+        await loadAnalysis();
+      });
+    }
+
+    async function changeDay(delta) {
+      const d = new Date(currentDate + 'T00:00:00');
+      d.setDate(d.getDate() + delta);
+      currentDate = d.toISOString().split('T')[0];
+      document.getElementById('analysis-date').value = currentDate;
+      await loadAnalysis();
+    }
+
+    async function loadTargets() {
+      const s = await Storage.getAllSettings();
+      targets = {
+        daily:     Number(s.calorieTarget)    || 2000,
+        breakfast: Number(s.targetBreakfast)  || 0,
+        lunch:     Number(s.targetLunch)      || 0,
+        snacks:    Number(s.targetSnacks)     || 0,
+        dinner:    Number(s.targetDinner)     || 0,
+      };
+      document.getElementById('target-daily').value     = targets.daily     || '';
+      document.getElementById('target-breakfast').value = targets.breakfast || '';
+      document.getElementById('target-lunch').value     = targets.lunch     || '';
+      document.getElementById('target-snacks').value    = targets.snacks    || '';
+      document.getElementById('target-dinner').value    = targets.dinner    || '';
+    }
+
+    async function loadAnalysis() {
+      const mealLog = await Storage.getMealLogByDate(currentDate);
+      const meals   = mealLog.meals;
+      const mealNames = ['breakfast','lunch','snacks','dinner'];
+      const mealTotals = {};
+      for (const m of mealNames) mealTotals[m] = App.sumNutrition(meals[m] || []);
+      const daily = App.sumMealNutrition(meals);
+
+      // Progress bars
+      const mealIcons = { breakfast:'🌅', lunch:'☀', snacks:'🍎', dinner:'🌙' };
+      App.renderProgressBar(document.getElementById('bar-daily-total'), daily.calories, targets.daily, 'Daily Total');
+      for (const m of mealNames) {
+        const t = targets[m] || Math.round(targets.daily * 0.3);
+        App.renderProgressBar(document.getElementById(`bar-${m}`), mealTotals[m].calories, t, `${mealIcons[m]} ${m.charAt(0).toUpperCase()+m.slice(1)}`);
+      }
+
+      Charts.renderMacroPieChart('chart-macro-pie', App.round2(daily.protein), App.round2(daily.carbs), App.round2(daily.fats));
+      Charts.renderMealCaloriesBar('chart-meal-bars', {
+        breakfast: App.round2(mealTotals.breakfast.calories),
+        lunch:     App.round2(mealTotals.lunch.calories),
+        snacks:    App.round2(mealTotals.snacks.calories),
+        dinner:    App.round2(mealTotals.dinner.calories),
+      });
+      Charts.renderMacroBarChart('chart-macro-bars', mealNames.map(m => mealTotals[m]));
+      renderNutritionTable(meals, mealTotals, daily);
+    }
+
+    function renderNutritionTable(meals, mealTotals, daily) {
+      const tbody = document.getElementById('nutrition-table-body');
+      const mealNames = ['breakfast','lunch','snacks','dinner'];
+      const mealIcons = { breakfast:'🌅', lunch:'☀', snacks:'🍎', dinner:'🌙' };
+      let html = '', hasData = false;
+
+      for (const m of mealNames) {
+        const items = meals[m] || [];
+        if (!items.length) continue;
+        hasData = true;
+        const t = mealTotals[m];
+        html += `<tr style="background:var(--bg-input)">
+          <td colspan="7" style="font-weight:700;font-size:0.85rem;color:var(--primary)">
+            ${mealIcons[m]} ${m.charAt(0).toUpperCase()+m.slice(1)} — ${App.fmtNum(t.calories,0)} kcal | P: ${App.fmtNum(t.protein,1)}g | C: ${App.fmtNum(t.carbs,1)}g | F: ${App.fmtNum(t.fats,1)}g
+          </td></tr>`;
+        for (const item of items) {
+          const n = item.nutrition;
+          html += `<tr class="sub-row">
+            <td>${item.foodName}</td>
+            <td>${item.quantity}g</td>
+            <td>${App.fmtNum(n.calories,0)}</td>
+            <td>${App.fmtNum(n.protein,1)}g</td>
+            <td>${App.fmtNum(n.carbs,1)}g</td>
+            <td>${App.fmtNum(n.fats,1)}g</td>
+            <td>${App.fmtNum(n.fiber,1)}g</td>
+          </tr>`;
+        }
+      }
+
+      if (!hasData) { tbody.innerHTML = '<tr><td colspan="7" class="table-empty">No meals logged for this date.</td></tr>'; return; }
+
+      html += `<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--bg-input)">
+        <td>TOTAL</td><td>—</td>
+        <td>${App.fmtNum(daily.calories,0)} kcal</td>
+        <td>${App.fmtNum(daily.protein,1)}g</td>
+        <td>${App.fmtNum(daily.carbs,1)}g</td>
+        <td>${App.fmtNum(daily.fats,1)}g</td>
+        <td>${App.fmtNum(daily.fiber,1)}g</td>
+      </tr>`;
+      tbody.innerHTML = html;
+    }
+
+    async function load7DayTrend() {
+      const [mealLogs, settings] = await Promise.all([Storage.getAllMealLogs(), Storage.getAllSettings()]);
+      const target  = Number(settings.calorieTarget) || 2000;
+      const last7   = App.getLast7Days();
+      const mealMap = {};
+      for (const log of mealLogs) mealMap[log.date] = log;
+
+      const labels   = last7.map(d => { const [,m,day] = d.split('-'); return `${day}/${m}`; });
+      const calories = last7.map(d => mealMap[d] ? Math.round(App.sumMealNutrition(mealMap[d].meals).calories) : 0);
+      Charts.renderCalorieTrendChart('chart-trend', labels, calories, target);
+    }
+
+    document.getElementById('btn-save-targets').addEventListener('click', async () => {
+      const daily     = Number(document.getElementById('target-daily').value)     || 2000;
+      const breakfast = Number(document.getElementById('target-breakfast').value) || 0;
+      const lunch     = Number(document.getElementById('target-lunch').value)     || 0;
+      const snacks    = Number(document.getElementById('target-snacks').value)    || 0;
+      const dinner    = Number(document.getElementById('target-dinner').value)    || 0;
+
+      await Promise.all([
+        Storage.setSetting('calorieTarget',   daily),
+        Storage.setSetting('targetBreakfast', breakfast),
+        Storage.setSetting('targetLunch',     lunch),
+        Storage.setSetting('targetSnacks',    snacks),
+        Storage.setSetting('targetDinner',    dinner),
+      ]);
+      targets = { daily, breakfast, lunch, snacks, dinner };
+      App.showToast('Targets saved!');
+      await loadAnalysis();
+    });
+
+    document.getElementById('btn-export-report').addEventListener('click', async () => {
+      const mealLog = await Storage.getMealLogByDate(currentDate);
+      App.downloadJSON(`nutritrack-report-${currentDate}.json`, {
+        date: currentDate,
+        meals: mealLog.meals,
+        totals: App.sumMealNutrition(mealLog.meals),
+        targets,
+      });
+      App.showToast('Report exported');
+    });
+  </script>
+</body>
+</html>

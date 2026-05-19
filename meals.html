@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NutriTrack — Meal Tracker</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+</head>
+<body class="body-padded">
+
+  <nav class="navbar">
+    <a href="index.html" class="nav-brand">Nutri<span>Track</span></a>
+    <button class="nav-toggle" id="nav-toggle"><span></span><span></span><span></span></button>
+    <div class="nav-menu" id="nav-menu">
+      <a href="index.html"    class="nav-link"><span class="nav-icon">⊞</span> Dashboard</a>
+      <a href="weight.html"   class="nav-link"><span class="nav-icon">⚖</span> Weight</a>
+      <a href="meals.html"    class="nav-link"><span class="nav-icon">🍽</span> Meals</a>
+      <a href="analysis.html" class="nav-link"><span class="nav-icon">📊</span> Analysis</a>
+      <a href="food-db.html"  class="nav-link"><span class="nav-icon">🥗</span> Food DB</a>
+    </div>
+    <div class="nav-actions nav-user">
+      <span class="nav-user-email" id="nav-user-email"></span>
+      <button class="btn-icon" id="theme-toggle" title="Toggle theme">☾</button>
+      <button class="btn btn-secondary btn-sm" onclick="FirebaseAuth.signOut()">Logout</button>
+    </div>
+  </nav>
+
+  <div id="toast-container"></div>
+
+  <main class="main-content">
+    <div class="page-header flex-between flex-wrap">
+      <div>
+        <h1 class="page-title">Meal Tracker</h1>
+        <p class="page-subtitle">Track what you eat throughout the day</p>
+      </div>
+      <div class="date-nav">
+        <button class="date-nav-btn" id="btn-prev-day">‹</button>
+        <input type="date" id="meal-date" />
+        <button class="date-nav-btn" id="btn-next-day">›</button>
+        <button class="date-nav-btn" id="btn-today" style="font-size:0.75rem;padding:0 6px;width:auto">Today</button>
+      </div>
+    </div>
+
+    <!-- Daily Summary -->
+    <div class="card mb-3">
+      <h3 class="card-title">Daily Summary</h3>
+      <div class="grid-4 mb-2">
+        <div class="macro-pill" style="min-width:0;flex:1">
+          <span class="macro-pill-value" id="total-calories" style="color:var(--primary);font-size:1.4rem">0</span>
+          <span class="macro-pill-label">Total kcal</span>
+        </div>
+        <div class="macro-pill protein" style="min-width:0;flex:1"><span class="macro-pill-value" id="total-protein">0</span><span class="macro-pill-label">Protein g</span></div>
+        <div class="macro-pill carbs"   style="min-width:0;flex:1"><span class="macro-pill-value" id="total-carbs">0</span>  <span class="macro-pill-label">Carbs g</span></div>
+        <div class="macro-pill fats"    style="min-width:0;flex:1"><span class="macro-pill-value" id="total-fats">0</span>   <span class="macro-pill-label">Fats g</span></div>
+      </div>
+      <div id="daily-calorie-bar"></div>
+    </div>
+
+    <!-- Breakfast -->
+    <div class="meal-section expanded" id="section-breakfast">
+      <div class="meal-header" onclick="toggleMeal('breakfast')">
+        <div class="meal-header-left"><span class="meal-icon">🌅</span><span class="meal-name">Breakfast</span></div>
+        <div class="flex" style="gap:1rem">
+          <span class="meal-calories" id="cal-breakfast">0 kcal</span>
+          <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); openAddFood('breakfast')">+ Add</button>
+          <span class="meal-toggle-icon">▼</span>
+        </div>
+      </div>
+      <div class="meal-body"><div id="items-breakfast"></div></div>
+    </div>
+
+    <!-- Lunch -->
+    <div class="meal-section expanded" id="section-lunch">
+      <div class="meal-header" onclick="toggleMeal('lunch')">
+        <div class="meal-header-left"><span class="meal-icon">☀</span><span class="meal-name">Lunch</span></div>
+        <div class="flex" style="gap:1rem">
+          <span class="meal-calories" id="cal-lunch">0 kcal</span>
+          <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); openAddFood('lunch')">+ Add</button>
+          <span class="meal-toggle-icon">▼</span>
+        </div>
+      </div>
+      <div class="meal-body"><div id="items-lunch"></div></div>
+    </div>
+
+    <!-- Snacks -->
+    <div class="meal-section expanded" id="section-snacks">
+      <div class="meal-header" onclick="toggleMeal('snacks')">
+        <div class="meal-header-left"><span class="meal-icon">🍎</span><span class="meal-name">Snacks</span></div>
+        <div class="flex" style="gap:1rem">
+          <span class="meal-calories" id="cal-snacks">0 kcal</span>
+          <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); openAddFood('snacks')">+ Add</button>
+          <span class="meal-toggle-icon">▼</span>
+        </div>
+      </div>
+      <div class="meal-body"><div id="items-snacks"></div></div>
+    </div>
+
+    <!-- Dinner -->
+    <div class="meal-section expanded" id="section-dinner">
+      <div class="meal-header" onclick="toggleMeal('dinner')">
+        <div class="meal-header-left"><span class="meal-icon">🌙</span><span class="meal-name">Dinner</span></div>
+        <div class="flex" style="gap:1rem">
+          <span class="meal-calories" id="cal-dinner">0 kcal</span>
+          <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); openAddFood('dinner')">+ Add</button>
+          <span class="meal-toggle-icon">▼</span>
+        </div>
+      </div>
+      <div class="meal-body"><div id="items-dinner"></div></div>
+    </div>
+  </main>
+
+  <!-- Add Food Modal -->
+  <div class="modal" id="modal-add-food">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modal-food-title">Add Food</h3>
+        <button class="modal-close" onclick="closeAddFoodModal()">✕</button>
+      </div>
+
+      <div class="form-group">
+        <label>Search Food Database</label>
+        <div class="search-wrapper">
+          <input type="text" id="food-search" placeholder="Type to search…" autocomplete="off" />
+          <div class="search-dropdown" id="food-dropdown"></div>
+        </div>
+      </div>
+
+      <div id="selected-food-preview" class="hidden">
+        <div class="card" style="padding:1rem;margin-bottom:1rem">
+          <div class="flex-between">
+            <div>
+              <strong id="preview-name">—</strong>
+              <div class="text-muted text-sm" id="preview-unit">—</div>
+            </div>
+            <span class="badge badge-blue" id="preview-cal">— kcal</span>
+          </div>
+          <div class="macro-row mt-1">
+            <div class="macro-pill protein" style="min-width:0;flex:1"><span class="macro-pill-value" id="preview-protein">0</span><span class="macro-pill-label">Protein g</span></div>
+            <div class="macro-pill carbs"   style="min-width:0;flex:1"><span class="macro-pill-value" id="preview-carbs">0</span>  <span class="macro-pill-label">Carbs g</span></div>
+            <div class="macro-pill fats"    style="min-width:0;flex:1"><span class="macro-pill-value" id="preview-fats">0</span>   <span class="macro-pill-label">Fats g</span></div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="food-quantity">Quantity (g) *</label>
+          <input type="number" id="food-quantity" min="1" max="5000" step="1" value="100" />
+        </div>
+        <div id="qty-preview" class="hidden text-muted text-sm" style="margin-bottom:1rem;padding:0.5rem;background:var(--bg-input);border-radius:8px"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeAddFoodModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btn-confirm-add-food" disabled>Add to Meal</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="auth.js"></script>
+  <script src="storage.js"></script>
+  <script src="app.js"></script>
+  <script>
+    let currentDate   = App.todayISO();
+    let currentMealLog = null;
+    let currentMeal   = null;
+    let selectedFood  = null;
+    let allFoods      = [];
+
+    FirebaseAuth.requireAuth().then(async (user) => {
+      document.getElementById('nav-user-email').textContent = user.email;
+      allFoods = await Storage.getAllFoods();
+      document.getElementById('meal-date').value = currentDate;
+      await loadMealLog();
+      setupSearch();
+      setupDateNav();
+    });
+
+    function setupDateNav() {
+      document.getElementById('meal-date').addEventListener('change', async (e) => {
+        currentDate = e.target.value;
+        await loadMealLog();
+      });
+      document.getElementById('btn-prev-day').addEventListener('click', () => changeDay(-1));
+      document.getElementById('btn-next-day').addEventListener('click', () => changeDay(1));
+      document.getElementById('btn-today').addEventListener('click', async () => {
+        currentDate = App.todayISO();
+        document.getElementById('meal-date').value = currentDate;
+        await loadMealLog();
+      });
+    }
+
+    async function changeDay(delta) {
+      const d = new Date(currentDate + 'T00:00:00');
+      d.setDate(d.getDate() + delta);
+      currentDate = d.toISOString().split('T')[0];
+      document.getElementById('meal-date').value = currentDate;
+      await loadMealLog();
+    }
+
+    async function loadMealLog() {
+      currentMealLog = await Storage.getMealLogByDate(currentDate);
+      renderAll();
+    }
+
+    async function saveMealLog() {
+      await Storage.saveMealLog(currentMealLog);
+      renderAll();
+    }
+
+    function renderAll() {
+      const meals  = currentMealLog.meals;
+      const daily  = App.sumMealNutrition(meals);
+
+      document.getElementById('total-calories').textContent = App.fmtNum(daily.calories, 0);
+      document.getElementById('total-protein').textContent  = App.fmtNum(daily.protein, 1);
+      document.getElementById('total-carbs').textContent    = App.fmtNum(daily.carbs, 1);
+      document.getElementById('total-fats').textContent     = App.fmtNum(daily.fats, 1);
+
+      Storage.getSetting('calorieTarget').then(target => {
+        App.renderProgressBar(
+          document.getElementById('daily-calorie-bar'),
+          daily.calories, Number(target) || 2000, 'Calories'
+        );
+      });
+
+      for (const meal of ['breakfast','lunch','snacks','dinner']) {
+        renderMealItems(meal, meals[meal] || []);
+      }
+    }
+
+    function renderMealItems(meal, items) {
+      const total = App.sumNutrition(items);
+      document.getElementById(`cal-${meal}`).textContent = App.fmtNum(total.calories, 0) + ' kcal';
+
+      const container = document.getElementById(`items-${meal}`);
+      if (!items.length) {
+        container.innerHTML = '<div class="text-muted text-sm" style="padding:0.75rem 0">No items yet. Click "+ Add" to log food.</div>';
+        return;
+      }
+      container.innerHTML = items.map((item, idx) => `
+        <div class="food-item-row">
+          <div class="food-item-name">${item.foodName}</div>
+          <div class="food-item-meta">${item.quantity}g</div>
+          <div class="food-item-meta">P: ${App.fmtNum(item.nutrition.protein,1)}g  C: ${App.fmtNum(item.nutrition.carbs,1)}g  F: ${App.fmtNum(item.nutrition.fats,1)}g</div>
+          <div class="food-item-cals">${App.fmtNum(item.nutrition.calories,0)} kcal</div>
+          <button class="btn btn-danger btn-sm" onclick="removeItem('${meal}', ${idx})">✕</button>
+        </div>
+      `).join('');
+    }
+
+    function toggleMeal(meal) {
+      document.getElementById(`section-${meal}`).classList.toggle('expanded');
+    }
+
+    // ── Food Search ──────────────────────────────────────────────────────────
+
+    function setupSearch() {
+      const input    = document.getElementById('food-search');
+      const dropdown = document.getElementById('food-dropdown');
+
+      input.addEventListener('input', () => {
+        const q = input.value.trim();
+        if (q.length < 1) { dropdown.classList.remove('open'); return; }
+
+        const results = allFoods.filter(f => f.name.toLowerCase().includes(q.toLowerCase())).slice(0, 10);
+
+        dropdown.innerHTML = results.length === 0
+          ? '<div class="search-dropdown-item"><span class="search-item-name text-muted">No results found</span></div>'
+          : results.map(f =>
+              `<div class="search-dropdown-item" onclick="selectFood('${f.id}')">
+                <span class="search-item-name">${f.name}</span>
+                <span class="search-item-meta">${f.calories} kcal/${f.unit || '100g'}</span>
+              </div>`
+            ).join('');
+        dropdown.classList.add('open');
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('.search-wrapper')) dropdown.classList.remove('open');
+      });
+    }
+
+    async function selectFood(id) {
+      selectedFood = await Storage.getFoodById(id);
+      if (!selectedFood) return;
+      document.getElementById('food-dropdown').classList.remove('open');
+      document.getElementById('food-search').value = selectedFood.name;
+
+      document.getElementById('selected-food-preview').classList.remove('hidden');
+      document.getElementById('preview-name').textContent    = selectedFood.name;
+      document.getElementById('preview-unit').textContent    = selectedFood.unit || 'per 100g';
+      document.getElementById('preview-cal').textContent     = selectedFood.calories + ' kcal';
+      document.getElementById('preview-protein').textContent = App.fmtNum(selectedFood.protein, 1);
+      document.getElementById('preview-carbs').textContent   = App.fmtNum(selectedFood.carbs, 1);
+      document.getElementById('preview-fats').textContent    = App.fmtNum(selectedFood.fats, 1);
+      document.getElementById('btn-confirm-add-food').disabled = false;
+      updateQtyPreview();
+    }
+
+    document.getElementById('food-quantity').addEventListener('input', updateQtyPreview);
+
+    function updateQtyPreview() {
+      if (!selectedFood) return;
+      const qty = parseFloat(document.getElementById('food-quantity').value) || 0;
+      const n   = App.calcNutrition(selectedFood, qty);
+      const el  = document.getElementById('qty-preview');
+      el.classList.remove('hidden');
+      el.innerHTML = `For <strong>${qty}g</strong>: ${App.fmtNum(n.calories,0)} kcal | P: ${App.fmtNum(n.protein,1)}g | C: ${App.fmtNum(n.carbs,1)}g | F: ${App.fmtNum(n.fats,1)}g`;
+    }
+
+    function openAddFood(meal) {
+      currentMeal  = meal;
+      selectedFood = null;
+      document.getElementById('modal-food-title').textContent = `Add to ${meal.charAt(0).toUpperCase()+meal.slice(1)}`;
+      document.getElementById('food-search').value = '';
+      document.getElementById('food-dropdown').classList.remove('open');
+      document.getElementById('selected-food-preview').classList.add('hidden');
+      document.getElementById('qty-preview').classList.add('hidden');
+      document.getElementById('food-quantity').value = '100';
+      document.getElementById('btn-confirm-add-food').disabled = true;
+      App.openModal('modal-add-food');
+      // Refresh food list in case new foods were added in another tab
+      Storage.getAllFoods().then(foods => { allFoods = foods; });
+    }
+
+    function closeAddFoodModal() {
+      App.closeModal('modal-add-food');
+      currentMeal  = null;
+      selectedFood = null;
+    }
+
+    document.getElementById('btn-confirm-add-food').addEventListener('click', async () => {
+      if (!selectedFood || !currentMeal) return;
+      const qty = parseFloat(document.getElementById('food-quantity').value);
+      if (!qty || qty <= 0) { App.showToast('Enter a valid quantity', 'error'); return; }
+
+      currentMealLog.meals[currentMeal].push({
+        foodId:   selectedFood.id,
+        foodName: selectedFood.name,
+        quantity: qty,
+        nutrition: App.calcNutrition(selectedFood, qty),
+      });
+
+      await saveMealLog();
+      closeAddFoodModal();
+      App.showToast(`${selectedFood.name} added to ${currentMeal}`);
+    });
+
+    async function removeItem(meal, idx) {
+      currentMealLog.meals[meal].splice(idx, 1);
+      await saveMealLog();
+      App.showToast('Item removed');
+    }
+  </script>
+</body>
+</html>

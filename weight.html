@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NutriTrack — Weight Tracker</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body class="body-padded">
+
+  <nav class="navbar">
+    <a href="index.html" class="nav-brand">Nutri<span>Track</span></a>
+    <button class="nav-toggle" id="nav-toggle"><span></span><span></span><span></span></button>
+    <div class="nav-menu" id="nav-menu">
+      <a href="index.html"    class="nav-link"><span class="nav-icon">⊞</span> Dashboard</a>
+      <a href="weight.html"   class="nav-link"><span class="nav-icon">⚖</span> Weight</a>
+      <a href="meals.html"    class="nav-link"><span class="nav-icon">🍽</span> Meals</a>
+      <a href="analysis.html" class="nav-link"><span class="nav-icon">📊</span> Analysis</a>
+      <a href="food-db.html"  class="nav-link"><span class="nav-icon">🥗</span> Food DB</a>
+    </div>
+    <div class="nav-actions nav-user">
+      <span class="nav-user-email" id="nav-user-email"></span>
+      <button class="btn-icon" id="theme-toggle" title="Toggle theme">☾</button>
+      <button class="btn btn-secondary btn-sm" onclick="FirebaseAuth.signOut()">Logout</button>
+    </div>
+  </nav>
+
+  <div id="toast-container"></div>
+
+  <main class="main-content">
+    <div class="page-header flex-between flex-wrap">
+      <div>
+        <h1 class="page-title">Weight Tracker</h1>
+        <p class="page-subtitle">Monitor your weight progress over time</p>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-secondary" id="btn-export-csv">⬇ Export CSV</button>
+        <button class="btn btn-primary"   id="btn-add-weight">+ Log Weight</button>
+      </div>
+    </div>
+
+    <div class="grid-4 mb-3">
+      <div class="stat-card">
+        <div class="stat-icon orange">⚖</div>
+        <div class="stat-info">
+          <div class="stat-label">Latest</div>
+          <div class="stat-value" id="ws-latest">—</div>
+          <div class="stat-sub" id="ws-latest-date">—</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon blue">📉</div>
+        <div class="stat-info">
+          <div class="stat-label">Lowest</div>
+          <div class="stat-value" id="ws-lowest">—</div>
+          <div class="stat-sub">recorded</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon red">📈</div>
+        <div class="stat-info">
+          <div class="stat-label">Highest</div>
+          <div class="stat-value" id="ws-highest">—</div>
+          <div class="stat-sub">recorded</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green">〜</div>
+        <div class="stat-info">
+          <div class="stat-label">Weekly Avg</div>
+          <div class="stat-value" id="ws-avg">—</div>
+          <div class="stat-sub">last 7 days</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="section-header">
+        <h3 class="card-title" style="margin:0">Weight Trend</h3>
+        <select id="chart-range" style="width:auto">
+          <option value="30">Last 30 days</option>
+          <option value="90">Last 90 days</option>
+          <option value="all">All time</option>
+        </select>
+      </div>
+      <div class="chart-container-lg">
+        <canvas id="chart-weight"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-header">
+        <h3 class="card-title" style="margin:0">History</h3>
+        <span class="text-muted text-sm" id="entry-count">0 entries</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Date</th><th>Weight (kg)</th><th>Change</th><th>Notes</th><th></th></tr>
+          </thead>
+          <tbody id="weight-table-body">
+            <tr><td colspan="5" class="table-empty">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Add/Edit Modal -->
+  <div class="modal" id="modal-weight">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modal-weight-title">Log Weight</h3>
+        <button class="modal-close" onclick="App.closeModal('modal-weight')">✕</button>
+      </div>
+      <form id="form-weight" novalidate>
+        <input type="hidden" id="weight-edit-id" />
+        <div class="form-row">
+          <div class="form-group">
+            <label for="input-weight">Weight (kg) *</label>
+            <input type="number" id="input-weight" step="0.01" min="1" max="500" placeholder="e.g. 72.5" required />
+          </div>
+          <div class="form-group">
+            <label for="input-weight-date">Date *</label>
+            <input type="date" id="input-weight-date" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="input-weight-notes">Notes (optional)</label>
+          <input type="text" id="input-weight-notes" placeholder="e.g. Morning, after workout…" maxlength="200" />
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="App.closeModal('modal-weight')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Entry</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="auth.js"></script>
+  <script src="storage.js"></script>
+  <script src="app.js"></script>
+  <script src="charts.js"></script>
+  <script>
+    let allLogs = [];
+
+    FirebaseAuth.requireAuth().then(async (user) => {
+      document.getElementById('nav-user-email').textContent = user.email;
+      await loadLogs();
+    });
+
+    async function loadLogs() {
+      allLogs = await Storage.getAllWeightLogs();
+      renderStats();
+      renderChart();
+      renderTable();
+    }
+
+    function renderStats() {
+      if (!allLogs.length) return;
+      const weights = allLogs.map(l => l.weight);
+      const latest  = allLogs[allLogs.length - 1];
+
+      document.getElementById('ws-latest').textContent      = latest.weight + ' kg';
+      document.getElementById('ws-latest-date').textContent = App.formatDate(latest.date);
+      document.getElementById('ws-lowest').textContent      = Math.min(...weights) + ' kg';
+      document.getElementById('ws-highest').textContent     = Math.max(...weights) + ' kg';
+
+      const last7   = App.getLast7Days();
+      const inLast7 = allLogs.filter(l => last7.includes(l.date));
+      if (inLast7.length) {
+        const avg = inLast7.reduce((s, l) => s + l.weight, 0) / inLast7.length;
+        document.getElementById('ws-avg').textContent = App.fmtNum(avg, 1) + ' kg';
+      }
+    }
+
+    function renderChart() {
+      const range = document.getElementById('chart-range').value;
+      let data = [...allLogs];
+
+      if (range !== 'all') {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - Number(range));
+        const cutStr = cutoff.toISOString().split('T')[0];
+        data = data.filter(l => l.date >= cutStr);
+      }
+
+      Charts.renderWeightChart('chart-weight', data.map(l => App.formatDate(l.date)), data.map(l => l.weight));
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('weight-table-body');
+      document.getElementById('entry-count').textContent = `${allLogs.length} entries`;
+
+      if (!allLogs.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No weight entries yet. Click "Log Weight" to start.</td></tr>';
+        return;
+      }
+
+      const sorted = [...allLogs].reverse();
+      tbody.innerHTML = sorted.map((log, idx) => {
+        const prev = allLogs[allLogs.length - 1 - idx - 1];
+        let change = '—', changeClass = '';
+        if (prev) {
+          const diff = App.round2(log.weight - prev.weight);
+          change = (diff >= 0 ? '+' : '') + diff + ' kg';
+          changeClass = diff > 0 ? 'text-danger' : diff < 0 ? 'text-success' : '';
+        }
+        return `<tr>
+          <td>${App.formatDateLong(log.date)}</td>
+          <td><strong>${log.weight} kg</strong></td>
+          <td class="${changeClass}">${change}</td>
+          <td class="text-muted text-sm">${log.notes || '—'}</td>
+          <td>
+            <div class="btn-group">
+              <button class="btn btn-secondary btn-sm" onclick="editLog('${log.id}')">Edit</button>
+              <button class="btn btn-danger btn-sm"    onclick="deleteLog('${log.id}')">Delete</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    function openAddModal() {
+      document.getElementById('modal-weight-title').textContent = 'Log Weight';
+      document.getElementById('weight-edit-id').value   = '';
+      document.getElementById('input-weight').value     = '';
+      document.getElementById('input-weight-date').value = App.todayISO();
+      document.getElementById('input-weight-notes').value = '';
+      App.openModal('modal-weight');
+    }
+
+    function editLog(id) {
+      const log = allLogs.find(l => l.id === id);
+      if (!log) return;
+      document.getElementById('modal-weight-title').textContent  = 'Edit Entry';
+      document.getElementById('weight-edit-id').value            = id;
+      document.getElementById('input-weight').value              = log.weight;
+      document.getElementById('input-weight-date').value         = log.date;
+      document.getElementById('input-weight-notes').value        = log.notes || '';
+      App.openModal('modal-weight');
+    }
+
+    async function deleteLog(id) {
+      if (!App.confirmAction('Delete this weight entry?')) return;
+      await Storage.deleteWeightLog(id);
+      App.showToast('Entry deleted');
+      await loadLogs();
+    }
+
+    document.getElementById('form-weight').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const weightVal = parseFloat(document.getElementById('input-weight').value);
+      const dateVal   = document.getElementById('input-weight-date').value;
+      const notesVal  = document.getElementById('input-weight-notes').value.trim();
+
+      let valid = true;
+      if (!weightVal || weightVal <= 0) { document.getElementById('input-weight').classList.add('field-error'); valid = false; }
+      else                              { document.getElementById('input-weight').classList.remove('field-error'); }
+      if (!dateVal) { document.getElementById('input-weight-date').classList.add('field-error'); valid = false; }
+      else          { document.getElementById('input-weight-date').classList.remove('field-error'); }
+      if (!valid) return;
+
+      const editId = document.getElementById('weight-edit-id').value;
+      if (editId) {
+        await Storage.updateWeightLog({ id: editId, weight: weightVal, date: dateVal, notes: notesVal });
+        App.showToast('Entry updated');
+      } else {
+        await Storage.addWeightLog({ weight: weightVal, date: dateVal, notes: notesVal });
+        App.showToast('Weight logged!');
+      }
+
+      App.closeModal('modal-weight');
+      await loadLogs();
+    });
+
+    document.getElementById('btn-add-weight').addEventListener('click', openAddModal);
+    document.getElementById('chart-range').addEventListener('change', renderChart);
+    document.getElementById('btn-export-csv').addEventListener('click', () => {
+      if (!allLogs.length) { App.showToast('No data to export', 'error'); return; }
+      App.downloadCSV('weight-log.csv', allLogs, ['date','weight','notes']);
+      App.showToast('CSV downloaded');
+    });
+  </script>
+</body>
+</html>

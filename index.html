@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NutriTrack — Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body class="body-padded">
+
+  <nav class="navbar">
+    <a href="index.html" class="nav-brand">Nutri<span>Track</span></a>
+    <button class="nav-toggle" id="nav-toggle"><span></span><span></span><span></span></button>
+    <div class="nav-menu" id="nav-menu">
+      <a href="index.html"    class="nav-link"><span class="nav-icon">⊞</span> Dashboard</a>
+      <a href="weight.html"   class="nav-link"><span class="nav-icon">⚖</span> Weight</a>
+      <a href="meals.html"    class="nav-link"><span class="nav-icon">🍽</span> Meals</a>
+      <a href="analysis.html" class="nav-link"><span class="nav-icon">📊</span> Analysis</a>
+      <a href="food-db.html"  class="nav-link"><span class="nav-icon">🥗</span> Food DB</a>
+    </div>
+    <div class="nav-actions nav-user">
+      <span class="nav-user-email" id="nav-user-email"></span>
+      <button class="btn-icon" id="theme-toggle" title="Toggle theme">☾</button>
+      <button class="btn btn-secondary btn-sm" onclick="FirebaseAuth.signOut()">Logout</button>
+    </div>
+  </nav>
+
+  <div id="toast-container"></div>
+
+  <main class="main-content">
+    <!-- Migration banner (shown if old local data is detected) -->
+    <div class="migration-banner hidden" id="migration-banner">
+      <div class="migration-banner-info">
+        <strong>Local data found</strong>
+        <p>You have existing data from before signing in. Migrate it to your account?</p>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-secondary btn-sm" id="btn-dismiss-migration">Dismiss</button>
+        <button class="btn btn-primary   btn-sm" id="btn-migrate">Migrate Data</button>
+      </div>
+    </div>
+
+    <div class="page-header flex-between flex-wrap">
+      <div>
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-subtitle" id="dash-date">Today's overview</p>
+      </div>
+      <a href="meals.html" class="btn btn-primary">+ Log Meal</a>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="quick-stats">
+      <div class="stat-card">
+        <div class="stat-icon blue">🔥</div>
+        <div class="stat-info">
+          <div class="stat-label">Calories Today</div>
+          <div class="stat-value" id="stat-calories">—</div>
+          <div class="stat-sub" id="stat-cal-target">of — kcal target</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon cyan">💧</div>
+        <div class="stat-info">
+          <div class="stat-label">Protein</div>
+          <div class="stat-value" id="stat-protein">—</div>
+          <div class="stat-sub">grams</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon orange">⚖</div>
+        <div class="stat-info">
+          <div class="stat-label">Current Weight</div>
+          <div class="stat-value" id="stat-weight">—</div>
+          <div class="stat-sub" id="stat-weight-date">—</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green">📅</div>
+        <div class="stat-info">
+          <div class="stat-label">Logged Days</div>
+          <div class="stat-value" id="stat-days">—</div>
+          <div class="stat-sub">meal entries</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2 mb-3 mt-3">
+      <div class="card">
+        <h3 class="card-title">Calorie Progress</h3>
+        <div id="dash-calorie-progress"></div>
+        <div class="divider"></div>
+        <div class="macro-row">
+          <div class="macro-pill protein"><span class="macro-pill-value" id="d-protein">0</span><span class="macro-pill-label">Protein g</span></div>
+          <div class="macro-pill carbs">  <span class="macro-pill-value" id="d-carbs">0</span>  <span class="macro-pill-label">Carbs g</span></div>
+          <div class="macro-pill fats">   <span class="macro-pill-value" id="d-fats">0</span>   <span class="macro-pill-label">Fats g</span></div>
+          <div class="macro-pill fiber">  <span class="macro-pill-value" id="d-fiber">0</span>  <span class="macro-pill-label">Fiber g</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">Today's Meals</h3>
+        <div id="dash-meals-summary"></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3 class="card-title">7-Day Calorie Trend</h3>
+        <div class="chart-container">
+          <canvas id="chart-calorie-trend"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Macro Distribution</h3>
+        <div class="chart-container">
+          <canvas id="chart-macro-pie"></canvas>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="auth.js"></script>
+  <script src="storage.js"></script>
+  <script src="app.js"></script>
+  <script src="charts.js"></script>
+  <script>
+    FirebaseAuth.requireAuth().then(async (user) => {
+      document.getElementById('nav-user-email').textContent = user.email;
+
+      await Storage.init();
+      await Storage.seedDefaultFoods();
+
+      // Check for old local data to migrate
+      const pending = await Storage.hasPendingMigration();
+      if (pending) {
+        document.getElementById('migration-banner').classList.remove('hidden');
+      }
+
+      await loadDashboard();
+    });
+
+    document.getElementById('btn-migrate').addEventListener('click', async () => {
+      const btn = document.getElementById('btn-migrate');
+      btn.disabled = true;
+      btn.textContent = 'Migrating…';
+      try {
+        const stats = await Storage.migrateFromIndexedDB();
+        document.getElementById('migration-banner').classList.add('hidden');
+        App.showToast(`Migrated: ${stats.weightLogs} weight logs, ${stats.mealLogs} meal logs, ${stats.foods} foods`);
+        await loadDashboard();
+      } catch (err) {
+        App.showToast('Migration failed: ' + err.message, 'error');
+        btn.disabled = false;
+        btn.textContent = 'Migrate Data';
+      }
+    });
+
+    document.getElementById('btn-dismiss-migration').addEventListener('click', async () => {
+      document.getElementById('migration-banner').classList.add('hidden');
+      await Storage.setSetting('migrationDone', true);
+    });
+
+    async function loadDashboard() {
+      const today = App.todayISO();
+      document.getElementById('dash-date').textContent = App.formatDateLong(today);
+
+      const [mealLog, weightLogs, mealLogs, settings] = await Promise.all([
+        Storage.getMealLogByDate(today),
+        Storage.getAllWeightLogs(),
+        Storage.getAllMealLogs(),
+        Storage.getAllSettings(),
+      ]);
+
+      const calorieTarget  = Number(settings.calorieTarget) || 2000;
+      const todayNutrition = App.sumMealNutrition(mealLog.meals);
+
+      document.getElementById('stat-calories').textContent  = App.fmtNum(todayNutrition.calories, 0) + ' kcal';
+      document.getElementById('stat-cal-target').textContent = `of ${calorieTarget} kcal target`;
+      document.getElementById('stat-protein').textContent   = App.fmtNum(todayNutrition.protein, 1) + 'g';
+
+      if (weightLogs.length > 0) {
+        const last = weightLogs[weightLogs.length - 1];
+        document.getElementById('stat-weight').textContent      = last.weight + ' kg';
+        document.getElementById('stat-weight-date').textContent = App.formatDate(last.date);
+      }
+
+      document.getElementById('stat-days').textContent = mealLogs.length;
+
+      App.renderProgressBar(
+        document.getElementById('dash-calorie-progress'),
+        todayNutrition.calories, calorieTarget, 'Daily Calories'
+      );
+
+      document.getElementById('d-protein').textContent = App.fmtNum(todayNutrition.protein, 1);
+      document.getElementById('d-carbs').textContent   = App.fmtNum(todayNutrition.carbs, 1);
+      document.getElementById('d-fats').textContent    = App.fmtNum(todayNutrition.fats, 1);
+      document.getElementById('d-fiber').textContent   = App.fmtNum(todayNutrition.fiber, 1);
+
+      // Meal summary
+      const mealIcons = { breakfast:'🌅', lunch:'☀', snacks:'🍎', dinner:'🌙' };
+      let summaryHtml = '';
+      let hasMeals = false;
+      for (const m of ['breakfast','lunch','snacks','dinner']) {
+        const items = mealLog.meals[m] || [];
+        if (!items.length) continue;
+        hasMeals = true;
+        const cal = App.sumNutrition(items).calories;
+        summaryHtml += `
+          <div class="flex-between" style="padding:0.45rem 0;border-bottom:1px solid var(--border)">
+            <span>${mealIcons[m]} ${m.charAt(0).toUpperCase()+m.slice(1)}
+              <span class="text-muted text-sm">(${items.length} item${items.length>1?'s':''})</span>
+            </span>
+            <strong>${App.fmtNum(cal,0)} kcal</strong>
+          </div>`;
+      }
+      if (!hasMeals) {
+        summaryHtml = `<div class="empty-state">
+          <div class="empty-state-icon">🍽</div>
+          <div class="empty-state-title">No meals logged yet</div>
+          <div class="empty-state-desc">Go to <a href="meals.html">Meals</a> to log your food</div>
+        </div>`;
+      }
+      document.getElementById('dash-meals-summary').innerHTML = summaryHtml;
+
+      // 7-day trend
+      const last7   = App.getLast7Days();
+      const mealMap = {};
+      for (const log of mealLogs) mealMap[log.date] = log;
+
+      const trendCalories = last7.map(d => mealMap[d] ? Math.round(App.sumMealNutrition(mealMap[d].meals).calories) : 0);
+      const trendLabels   = last7.map(d => { const [,m,day] = d.split('-'); return `${day}/${m}`; });
+
+      Charts.renderCalorieTrendChart('chart-calorie-trend', trendLabels, trendCalories, calorieTarget);
+      Charts.renderMacroPieChart('chart-macro-pie',
+        App.round2(todayNutrition.protein),
+        App.round2(todayNutrition.carbs),
+        App.round2(todayNutrition.fats)
+      );
+    }
+  </script>
+</body>
+</html>

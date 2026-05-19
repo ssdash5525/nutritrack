@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NutriTrack — Sign In</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+</head>
+<body class="auth-page">
+
+  <!-- Theme toggle in corner -->
+  <button class="btn-icon auth-theme-btn" id="theme-toggle" title="Toggle theme">☾</button>
+
+  <div class="auth-card">
+    <div class="auth-logo">Nutri<span>Track</span></div>
+    <p class="auth-subtitle">Sign in to sync your data across all devices</p>
+
+    <div class="auth-error" id="auth-error"></div>
+
+    <form id="form-login" novalidate>
+      <div class="form-group">
+        <label for="input-email">Email</label>
+        <input type="email" id="input-email" placeholder="you@example.com" autocomplete="email" required />
+      </div>
+
+      <div class="form-group">
+        <label for="input-password">Password</label>
+        <div class="password-wrapper">
+          <input type="password" id="input-password" placeholder="••••••••" autocomplete="current-password" required />
+          <button type="button" class="password-toggle" id="pw-toggle" tabindex="-1" title="Show/hide password">👁</button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-full" id="btn-login" style="margin-top:0.5rem">
+        Sign In
+      </button>
+    </form>
+
+    <div class="auth-divider">
+      <button type="button" class="auth-link-btn" id="btn-forgot">Forgot password?</button>
+    </div>
+
+    <div class="auth-footer">
+      Don't have an account? <a href="signup.html">Create one</a>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script src="auth.js"></script>
+  <script src="app.js"></script>
+  <script>
+    // Redirect already-logged-in users
+    FirebaseAuth.requireGuest('index.html');
+
+    const errorEl = document.getElementById('auth-error');
+
+    function showError(msg) {
+      errorEl.textContent = msg;
+      errorEl.classList.add('show');
+    }
+    function clearError() {
+      errorEl.classList.remove('show');
+    }
+
+    // Password visibility toggle
+    document.getElementById('pw-toggle').addEventListener('click', () => {
+      const input = document.getElementById('input-password');
+      input.type = input.type === 'password' ? 'text' : 'password';
+    });
+
+    // Login form
+    document.getElementById('form-login').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearError();
+
+      const email    = document.getElementById('input-email').value.trim();
+      const password = document.getElementById('input-password').value;
+      const btn      = document.getElementById('btn-login');
+
+      if (!email || !password) { showError('Please enter your email and password.'); return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Signing in…';
+
+      try {
+        await FirebaseAuth.signIn(email, password);
+        window.location.href = 'index.html';
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+        showError(friendlyError(err.code));
+      }
+    });
+
+    // Forgot password
+    document.getElementById('btn-forgot').addEventListener('click', async () => {
+      const email = document.getElementById('input-email').value.trim();
+      if (!email) {
+        showError('Enter your email address above first, then click "Forgot password?".');
+        return;
+      }
+      try {
+        await FirebaseAuth.sendPasswordReset(email);
+        App.showToast('Password reset email sent — check your inbox', 'info');
+        clearError();
+      } catch (err) {
+        showError(friendlyError(err.code));
+      }
+    });
+
+    function friendlyError(code) {
+      const map = {
+        'auth/user-not-found':      'No account found with that email.',
+        'auth/wrong-password':      'Incorrect password. Try again or reset it.',
+        'auth/invalid-email':       'Please enter a valid email address.',
+        'auth/too-many-requests':   'Too many failed attempts. Try again later or reset your password.',
+        'auth/user-disabled':       'This account has been disabled.',
+        'auth/invalid-credential':  'Email or password is incorrect.',
+        'auth/network-request-failed': 'Network error — check your connection.',
+      };
+      return map[code] || 'Something went wrong. Please try again.';
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NutriTrack — Food Database</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <style>
+    .category-filter { display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .filter-pill {
+      padding:0.3rem 0.8rem; border-radius:20px; font-size:0.78rem; font-weight:600;
+      border:1.5px solid var(--border); cursor:pointer; background:var(--bg-input); color:var(--text-muted);
+      transition:all 0.15s; font-family:var(--font);
+    }
+    .filter-pill.active, .filter-pill:hover { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .micronutrient-row { display:grid; grid-template-columns:1fr 1fr; gap:0.5rem 1rem; }
+    .import-area {
+      border:2px dashed var(--border); border-radius:var(--radius); padding:2rem;
+      text-align:center; cursor:pointer; transition:border-color 0.15s, background 0.15s;
+    }
+    .import-area:hover, .import-area.drag-over { border-color:var(--primary); background:rgba(79,70,229,0.04); }
+  </style>
+</head>
+<body class="body-padded">
+
+  <nav class="navbar">
+    <a href="index.html" class="nav-brand">Nutri<span>Track</span></a>
+    <button class="nav-toggle" id="nav-toggle"><span></span><span></span><span></span></button>
+    <div class="nav-menu" id="nav-menu">
+      <a href="index.html"    class="nav-link"><span class="nav-icon">⊞</span> Dashboard</a>
+      <a href="weight.html"   class="nav-link"><span class="nav-icon">⚖</span> Weight</a>
+      <a href="meals.html"    class="nav-link"><span class="nav-icon">🍽</span> Meals</a>
+      <a href="analysis.html" class="nav-link"><span class="nav-icon">📊</span> Analysis</a>
+      <a href="food-db.html"  class="nav-link"><span class="nav-icon">🥗</span> Food DB</a>
+    </div>
+    <div class="nav-actions nav-user">
+      <span class="nav-user-email" id="nav-user-email"></span>
+      <button class="btn-icon" id="theme-toggle" title="Toggle theme">☾</button>
+      <button class="btn btn-secondary btn-sm" onclick="FirebaseAuth.signOut()">Logout</button>
+    </div>
+  </nav>
+
+  <div id="toast-container"></div>
+
+  <main class="main-content">
+    <div class="page-header flex-between flex-wrap">
+      <div>
+        <h1 class="page-title">Food Database</h1>
+        <p class="page-subtitle">Manage your custom food items and nutrition data</p>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-secondary" id="btn-export-db">⬇ Export JSON</button>
+        <button class="btn btn-secondary" id="btn-import-btn">⬆ Import</button>
+        <button class="btn btn-primary"   id="btn-add-food">+ Add Food</button>
+      </div>
+    </div>
+
+    <div class="grid-3 mb-3">
+      <div class="stat-card">
+        <div class="stat-icon blue">🥗</div>
+        <div class="stat-info"><div class="stat-label">Total Foods</div><div class="stat-value" id="stat-total">0</div><div class="stat-sub">in database</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green">📂</div>
+        <div class="stat-info"><div class="stat-label">Categories</div><div class="stat-value" id="stat-categories">0</div><div class="stat-sub">unique</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon orange">⭐</div>
+        <div class="stat-info"><div class="stat-label">Highest Protein</div><div class="stat-value" id="stat-protein">—</div><div class="stat-sub">per 100g in DB</div></div>
+      </div>
+    </div>
+
+    <!-- Search & Filter -->
+    <div class="card mb-3">
+      <div class="form-row" style="margin-bottom:0.75rem">
+        <div class="form-group" style="margin-bottom:0"><label>Search</label><input type="text" id="db-search" placeholder="Search foods…" /></div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>Sort by</label>
+          <select id="db-sort">
+            <option value="name">Name (A–Z)</option>
+            <option value="calories-asc">Calories (Low–High)</option>
+            <option value="calories-desc">Calories (High–Low)</option>
+            <option value="protein">Highest Protein</option>
+          </select>
+        </div>
+      </div>
+      <div class="category-filter" id="category-filters"></div>
+    </div>
+
+    <!-- Table -->
+    <div class="card">
+      <div class="section-header">
+        <h3 class="card-title" style="margin:0">Foods</h3>
+        <span class="text-muted text-sm" id="food-count">0 foods</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Category</th><th>Calories</th><th>Protein</th><th>Carbs</th><th>Fats</th><th>Fiber</th><th>Unit</th><th></th></tr>
+          </thead>
+          <tbody id="food-table-body">
+            <tr><td colspan="9" class="table-empty">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Add/Edit Food Modal -->
+  <div class="modal" id="modal-food">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box" style="max-width:620px">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modal-food-title">Add Food</h3>
+        <button class="modal-close" onclick="App.closeModal('modal-food')">✕</button>
+      </div>
+      <form id="form-food" novalidate>
+        <input type="hidden" id="food-edit-id" />
+        <div class="form-group">
+          <label>Food Name *</label>
+          <input type="text" id="food-name" placeholder="e.g. Grilled Chicken Breast" maxlength="150" required />
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Category</label><input type="text" id="food-category" list="category-list" placeholder="e.g. Protein, Grains…" /><datalist id="category-list"></datalist></div>
+          <div class="form-group"><label>Unit / Serving Size *</label><input type="text" id="food-unit" placeholder="e.g. per 100g" value="per 100g" required /></div>
+        </div>
+        <h4 style="margin-bottom:0.75rem;color:var(--primary)">Macronutrients</h4>
+        <div class="form-row-3">
+          <div class="form-group"><label>Calories (kcal) *</label><input type="number" id="food-calories" min="0" step="0.1" placeholder="0" required /></div>
+          <div class="form-group"><label>Protein (g) *</label>      <input type="number" id="food-protein"  min="0" step="0.1" placeholder="0" required /></div>
+          <div class="form-group"><label>Carbohydrates (g) *</label><input type="number" id="food-carbs"    min="0" step="0.1" placeholder="0" required /></div>
+        </div>
+        <div class="form-row-3">
+          <div class="form-group"><label>Fats (g) *</label>  <input type="number" id="food-fats"  min="0" step="0.1" placeholder="0" required /></div>
+          <div class="form-group"><label>Fiber (g)</label>   <input type="number" id="food-fiber" min="0" step="0.1" placeholder="0" /></div>
+          <div class="form-group"><label>Sugar (g)</label>   <input type="number" id="food-sugar" min="0" step="0.1" placeholder="0" /></div>
+        </div>
+        <details style="margin-bottom:1rem">
+          <summary style="cursor:pointer;font-weight:600;font-size:0.9rem;color:var(--primary);margin-bottom:0.75rem">Micronutrients (optional) ▸</summary>
+          <div class="micronutrient-row">
+            <div class="form-group"><label>Sodium (mg)</label>    <input type="number" id="food-sodium"    min="0" step="1"    placeholder="0" /></div>
+            <div class="form-group"><label>Potassium (mg)</label> <input type="number" id="food-potassium" min="0" step="1"    placeholder="0" /></div>
+            <div class="form-group"><label>Calcium (mg)</label>   <input type="number" id="food-calcium"   min="0" step="1"    placeholder="0" /></div>
+            <div class="form-group"><label>Iron (mg)</label>      <input type="number" id="food-iron"      min="0" step="0.1"  placeholder="0" /></div>
+            <div class="form-group"><label>Vitamin C (mg)</label> <input type="number" id="food-vitc"      min="0" step="0.1"  placeholder="0" /></div>
+            <div class="form-group"><label>Vitamin D (µg)</label> <input type="number" id="food-vitd"      min="0" step="0.1"  placeholder="0" /></div>
+            <div class="form-group"><label>Vitamin B12 (µg)</label><input type="number" id="food-b12"     min="0" step="0.01" placeholder="0" /></div>
+            <div class="form-group"><label>Magnesium (mg)</label> <input type="number" id="food-magnesium" min="0" step="1"   placeholder="0" /></div>
+          </div>
+        </details>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="App.closeModal('modal-food')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Food</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Import Modal -->
+  <div class="modal" id="modal-import">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title">Import Data</h3>
+        <button class="modal-close" onclick="App.closeModal('modal-import')">✕</button>
+      </div>
+      <p class="text-muted mb-2">Import a NutriTrack JSON backup. This will replace ALL existing data in your account.</p>
+      <div class="import-area" id="import-drop-zone">
+        <div style="font-size:2rem;margin-bottom:0.5rem">📁</div>
+        <div style="font-weight:600;margin-bottom:0.25rem">Drop JSON file here</div>
+        <div class="text-muted text-sm">or click to browse</div>
+        <input type="file" id="import-file-input" accept=".json" style="display:none" />
+      </div>
+      <div id="import-preview" class="hidden mt-2">
+        <div class="card" style="padding:0.75rem">
+          <div id="import-preview-text" class="text-sm"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="App.closeModal('modal-import')">Cancel</button>
+        <button type="button" class="btn btn-danger" id="btn-confirm-import" disabled>Import & Overwrite</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="auth.js"></script>
+  <script src="storage.js"></script>
+  <script src="app.js"></script>
+  <script>
+    let allFoods      = [];
+    let filteredFoods = [];
+    let activeCategory = 'All';
+    let importData    = null;
+
+    FirebaseAuth.requireAuth().then(async (user) => {
+      document.getElementById('nav-user-email').textContent = user.email;
+      await loadFoods();
+    });
+
+    async function loadFoods() {
+      allFoods = await Storage.getAllFoods();
+      populateCategoryList();
+      applyFilters();
+      renderStats();
+    }
+
+    function renderStats() {
+      const cats = new Set(allFoods.map(f => f.category || 'Uncategorized'));
+      document.getElementById('stat-total').textContent      = allFoods.length;
+      document.getElementById('stat-categories').textContent = cats.size;
+
+      if (allFoods.length > 0) {
+        const maxProtein = allFoods.reduce((best, f) => (f.protein || 0) > (best.protein || 0) ? f : best, allFoods[0]);
+        document.getElementById('stat-protein').textContent = App.fmtNum(maxProtein.protein, 1) + 'g';
+      }
+    }
+
+    function populateCategoryList() {
+      const cats = ['All', ...[...new Set(allFoods.map(f => f.category || 'Uncategorized'))].sort()];
+      document.getElementById('category-list').innerHTML = cats.filter(c => c !== 'All').map(c => `<option value="${c}">`).join('');
+      document.getElementById('category-filters').innerHTML = cats.map(cat =>
+        `<button class="filter-pill${cat === activeCategory ? ' active' : ''}" onclick="setCategory('${cat}')">${cat}</button>`
+      ).join('');
+    }
+
+    function setCategory(cat) { activeCategory = cat; applyFilters(); populateCategoryList(); }
+
+    function applyFilters() {
+      const q    = document.getElementById('db-search').value.toLowerCase().trim();
+      const sort = document.getElementById('db-sort').value;
+
+      filteredFoods = allFoods.filter(f => {
+        const matchCat = activeCategory === 'All' || (f.category || 'Uncategorized') === activeCategory;
+        const matchQ   = !q || f.name.toLowerCase().includes(q) || (f.category || '').toLowerCase().includes(q);
+        return matchCat && matchQ;
+      });
+
+      filteredFoods.sort((a, b) => {
+        if (sort === 'name')          return a.name.localeCompare(b.name);
+        if (sort === 'calories-asc')  return (a.calories || 0) - (b.calories || 0);
+        if (sort === 'calories-desc') return (b.calories || 0) - (a.calories || 0);
+        if (sort === 'protein')       return (b.protein  || 0) - (a.protein  || 0);
+        return 0;
+      });
+
+      renderTable();
+    }
+
+    const CAT_COLORS = {
+      'Protein':'badge-blue','Grains':'badge-orange','Vegetables':'badge-green',
+      'Fruits':'badge-cyan','Dairy':'badge-orange','Nuts':'badge-orange',
+      'Fats':'badge-red','Uncategorized':'badge-gray',
+    };
+
+    function renderTable() {
+      const tbody = document.getElementById('food-table-body');
+      document.getElementById('food-count').textContent = `${filteredFoods.length} food${filteredFoods.length !== 1 ? 's' : ''}`;
+
+      if (!filteredFoods.length) {
+        tbody.innerHTML = '<tr><td colspan="9" class="table-empty">No foods found. Add your first food or adjust the search.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filteredFoods.map(f => {
+        const cc = CAT_COLORS[f.category] || 'badge-gray';
+        return `<tr>
+          <td><strong>${esc(f.name)}</strong></td>
+          <td><span class="badge ${cc}">${esc(f.category || 'Uncategorized')}</span></td>
+          <td>${App.fmtNum(f.calories, 0)}</td>
+          <td>${App.fmtNum(f.protein, 1)}g</td>
+          <td>${App.fmtNum(f.carbs, 1)}g</td>
+          <td>${App.fmtNum(f.fats, 1)}g</td>
+          <td>${App.fmtNum(f.fiber, 1)}g</td>
+          <td class="text-muted text-sm">${esc(f.unit || 'per 100g')}</td>
+          <td>
+            <div class="btn-group">
+              <button class="btn btn-secondary btn-sm" onclick="editFood('${f.id}')">Edit</button>
+              <button class="btn btn-danger btn-sm"    onclick="deleteFood('${f.id}')">Delete</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    // ── Add / Edit ───────────────────────────────────────────────────────────
+
+    function openAddModal() {
+      document.getElementById('modal-food-title').textContent = 'Add Food';
+      document.getElementById('food-edit-id').value = '';
+      document.getElementById('form-food').reset();
+      document.getElementById('food-unit').value = 'per 100g';
+      App.openModal('modal-food');
+    }
+
+    function editFood(id) {
+      const f = allFoods.find(x => x.id === id);
+      if (!f) return;
+      document.getElementById('modal-food-title').textContent = 'Edit Food';
+      document.getElementById('food-edit-id').value  = id;
+      document.getElementById('food-name').value     = f.name     || '';
+      document.getElementById('food-category').value = f.category || '';
+      document.getElementById('food-unit').value     = f.unit     || 'per 100g';
+      document.getElementById('food-calories').value = f.calories ?? '';
+      document.getElementById('food-protein').value  = f.protein  ?? '';
+      document.getElementById('food-carbs').value    = f.carbs    ?? '';
+      document.getElementById('food-fats').value     = f.fats     ?? '';
+      document.getElementById('food-fiber').value    = f.fiber    ?? '';
+      document.getElementById('food-sugar').value    = f.sugar    ?? '';
+      const m = f.micros || {};
+      document.getElementById('food-sodium').value    = m.sodium    ?? '';
+      document.getElementById('food-potassium').value = m.potassium ?? '';
+      document.getElementById('food-calcium').value   = m.calcium   ?? '';
+      document.getElementById('food-iron').value      = m.iron      ?? '';
+      document.getElementById('food-vitc').value      = m.vitaminC  ?? '';
+      document.getElementById('food-vitd').value      = m.vitaminD  ?? '';
+      document.getElementById('food-b12').value       = m.b12       ?? '';
+      document.getElementById('food-magnesium').value = m.magnesium ?? '';
+      App.openModal('modal-food');
+    }
+
+    async function deleteFood(id) {
+      if (!App.confirmAction('Delete this food? Existing meal logs keep their stored nutrition values.')) return;
+      await Storage.deleteFood(id);
+      App.showToast('Food deleted');
+      await loadFoods();
+    }
+
+    const REQUIRED = ['food-name','food-unit','food-calories','food-protein','food-carbs','food-fats'];
+    function getNum(id) { const v = parseFloat(document.getElementById(id).value); return isNaN(v) ? 0 : v; }
+
+    document.getElementById('form-food').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      let valid = true;
+      for (const id of REQUIRED) {
+        const el = document.getElementById(id);
+        if (!el.value.trim()) { el.classList.add('field-error'); valid = false; }
+        else                  { el.classList.remove('field-error'); }
+      }
+      if (!valid) { App.showToast('Please fill in all required fields', 'error'); return; }
+
+      const food = {
+        name:     document.getElementById('food-name').value.trim(),
+        category: document.getElementById('food-category').value.trim() || 'Uncategorized',
+        unit:     document.getElementById('food-unit').value.trim(),
+        calories: getNum('food-calories'),
+        protein:  getNum('food-protein'),
+        carbs:    getNum('food-carbs'),
+        fats:     getNum('food-fats'),
+        fiber:    getNum('food-fiber'),
+        sugar:    getNum('food-sugar'),
+        micros: {
+          sodium:    getNum('food-sodium')    || undefined,
+          potassium: getNum('food-potassium') || undefined,
+          calcium:   getNum('food-calcium')   || undefined,
+          iron:      getNum('food-iron')      || undefined,
+          vitaminC:  getNum('food-vitc')      || undefined,
+          vitaminD:  getNum('food-vitd')      || undefined,
+          b12:       getNum('food-b12')       || undefined,
+          magnesium: getNum('food-magnesium') || undefined,
+        },
+      };
+
+      const editId = document.getElementById('food-edit-id').value;
+      if (editId) {
+        await Storage.updateFood({ ...food, id: editId });
+        App.showToast('Food updated');
+      } else {
+        await Storage.addFood(food);
+        App.showToast('Food added!');
+      }
+
+      App.closeModal('modal-food');
+      await loadFoods();
+    });
+
+    // ── Export ───────────────────────────────────────────────────────────────
+
+    document.getElementById('btn-export-db').addEventListener('click', async () => {
+      const data = await Storage.exportAllData();
+      App.downloadJSON('nutritrack-backup.json', data);
+      App.showToast('Backup exported');
+    });
+
+    // ── Import ───────────────────────────────────────────────────────────────
+
+    document.getElementById('btn-import-btn').addEventListener('click', () => {
+      importData = null;
+      document.getElementById('import-preview').classList.add('hidden');
+      document.getElementById('btn-confirm-import').disabled = true;
+      document.getElementById('import-file-input').value = '';
+      App.openModal('modal-import');
+    });
+
+    const dropZone = document.getElementById('import-drop-zone');
+    dropZone.addEventListener('click', () => document.getElementById('import-file-input').click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('drag-over'); const f = e.dataTransfer.files[0]; if (f) readImportFile(f); });
+    document.getElementById('import-file-input').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) readImportFile(f); });
+
+    function readImportFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          importData = JSON.parse(e.target.result);
+          document.getElementById('import-preview').classList.remove('hidden');
+          document.getElementById('import-preview-text').innerHTML = `
+            <strong>File:</strong> ${esc(file.name)}<br>
+            <strong>Foods:</strong> ${(importData.foodDatabase||[]).length}<br>
+            <strong>Meal Logs:</strong> ${(importData.mealLogs||[]).length}<br>
+            <strong>Weight Logs:</strong> ${(importData.weightLogs||[]).length}<br>
+            <strong>Exported:</strong> ${importData.exportedAt || 'Unknown'}`;
+          document.getElementById('btn-confirm-import').disabled = false;
+        } catch {
+          App.showToast('Invalid JSON file', 'error');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    document.getElementById('btn-confirm-import').addEventListener('click', async () => {
+      if (!importData) return;
+      try {
+        await Storage.importAllData(importData);
+        App.closeModal('modal-import');
+        App.showToast('Data imported successfully!');
+        await loadFoods();
+      } catch (err) {
+        App.showToast('Import failed: ' + err.message, 'error');
+      }
+    });
+
+    document.getElementById('db-search').addEventListener('input', applyFilters);
+    document.getElementById('db-sort').addEventListener('change', applyFilters);
+    document.getElementById('btn-add-food').addEventListener('click', openAddModal);
+  </script>
+</body>
+</html>
