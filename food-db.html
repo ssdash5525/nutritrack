@@ -189,9 +189,9 @@
     </div>
   </div>
 
-  <script src="auth.js?v=2"></script>
-  <script src="storage.js?v=2"></script>
-  <script src="app.js?v=2"></script>
+  <script src="auth.js?v=3"></script>
+  <script src="storage.js?v=3"></script>
+  <script src="app.js?v=3"></script>
   <script>
     let allFoods      = [];
     let filteredFoods = [];
@@ -204,7 +204,7 @@
     });
 
     async function loadFoods() {
-      allFoods = await Storage.getAllFoods();
+      allFoods = await DB.getAllFoods();
       populateCategoryList();
       applyFilters();
       renderStats();
@@ -328,7 +328,7 @@
 
     async function deleteFood(id) {
       if (!App.confirmAction('Delete this food? Existing meal logs keep their stored nutrition values.')) return;
-      await Storage.deleteFood(id);
+      await DB.deleteFood(id);
       App.showToast('Food deleted');
       await loadFoods();
     }
@@ -370,10 +370,10 @@
 
       const editId = document.getElementById('food-edit-id').value;
       if (editId) {
-        await Storage.updateFood({ ...food, id: editId });
+        await DB.updateFood({ ...food, id: editId });
         App.showToast('Food updated');
       } else {
-        await Storage.addFood(food);
+        await DB.addFood(food);
         App.showToast('Food added!');
       }
 
@@ -384,7 +384,7 @@
     // ── Export ───────────────────────────────────────────────────────────────
 
     document.getElementById('btn-export-db').addEventListener('click', async () => {
-      const data = await Storage.exportAllData();
+      const data = await DB.exportAllData();
       App.downloadJSON('nutritrack-backup.json', data);
       App.showToast('Backup exported');
     });
@@ -429,7 +429,7 @@
     document.getElementById('btn-confirm-import').addEventListener('click', async () => {
       if (!importData) return;
       try {
-        await Storage.importAllData(importData);
+        await DB.importAllData(importData);
         App.closeModal('modal-import');
         App.showToast('Data imported successfully!');
         await loadFoods();

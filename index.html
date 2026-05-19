@@ -126,19 +126,19 @@
     </div>
   </main>
 
-  <script src="auth.js?v=2"></script>
-  <script src="storage.js?v=2"></script>
-  <script src="app.js?v=2"></script>
-  <script src="charts.js?v=2"></script>
+  <script src="auth.js?v=3"></script>
+  <script src="storage.js?v=3"></script>
+  <script src="app.js?v=3"></script>
+  <script src="charts.js?v=3"></script>
   <script>
     FirebaseAuth.requireAuth().then(async (user) => {
       document.getElementById('nav-user-email').textContent = user.email;
 
-      await Storage.init();
-      await Storage.seedDefaultFoods();
+      await DB.init();
+      await DB.seedDefaultFoods();
 
       // Check for old local data to migrate
-      const pending = await Storage.hasPendingMigration();
+      const pending = await DB.hasPendingMigration();
       if (pending) {
         document.getElementById('migration-banner').classList.remove('hidden');
       }
@@ -151,7 +151,7 @@
       btn.disabled = true;
       btn.textContent = 'Migrating…';
       try {
-        const stats = await Storage.migrateFromIndexedDB();
+        const stats = await DB.migrateFromIndexedDB();
         document.getElementById('migration-banner').classList.add('hidden');
         App.showToast(`Migrated: ${stats.weightLogs} weight logs, ${stats.mealLogs} meal logs, ${stats.foods} foods`);
         await loadDashboard();
@@ -164,7 +164,7 @@
 
     document.getElementById('btn-dismiss-migration').addEventListener('click', async () => {
       document.getElementById('migration-banner').classList.add('hidden');
-      await Storage.setSetting('migrationDone', true);
+      await DB.setSetting('migrationDone', true);
     });
 
     async function loadDashboard() {
@@ -172,10 +172,10 @@
       document.getElementById('dash-date').textContent = App.formatDateLong(today);
 
       const [mealLog, weightLogs, mealLogs, settings] = await Promise.all([
-        Storage.getMealLogByDate(today),
-        Storage.getAllWeightLogs(),
-        Storage.getAllMealLogs(),
-        Storage.getAllSettings(),
+        DB.getMealLogByDate(today),
+        DB.getAllWeightLogs(),
+        DB.getAllMealLogs(),
+        DB.getAllSettings(),
       ]);
 
       const calorieTarget  = Number(settings.calorieTarget) || 2000;

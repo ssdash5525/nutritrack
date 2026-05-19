@@ -119,10 +119,10 @@
     </div>
   </main>
 
-  <script src="auth.js?v=2"></script>
-  <script src="storage.js?v=2"></script>
-  <script src="app.js?v=2"></script>
-  <script src="charts.js?v=2"></script>
+  <script src="auth.js?v=3"></script>
+  <script src="storage.js?v=3"></script>
+  <script src="app.js?v=3"></script>
+  <script src="charts.js?v=3"></script>
   <script>
     let currentDate = App.todayISO();
     let targets     = {};
@@ -156,7 +156,7 @@
     }
 
     async function loadTargets() {
-      const s = await Storage.getAllSettings();
+      const s = await DB.getAllSettings();
       targets = {
         daily:     Number(s.calorieTarget)    || 2000,
         breakfast: Number(s.targetBreakfast)  || 0,
@@ -172,7 +172,7 @@
     }
 
     async function loadAnalysis() {
-      const mealLog = await Storage.getMealLogByDate(currentDate);
+      const mealLog = await DB.getMealLogByDate(currentDate);
       const meals   = mealLog.meals;
       const mealNames = ['breakfast','lunch','snacks','dinner'];
       const mealTotals = {};
@@ -241,7 +241,7 @@
     }
 
     async function load7DayTrend() {
-      const [mealLogs, settings] = await Promise.all([Storage.getAllMealLogs(), Storage.getAllSettings()]);
+      const [mealLogs, settings] = await Promise.all([DB.getAllMealLogs(), DB.getAllSettings()]);
       const target  = Number(settings.calorieTarget) || 2000;
       const last7   = App.getLast7Days();
       const mealMap = {};
@@ -260,11 +260,11 @@
       const dinner    = Number(document.getElementById('target-dinner').value)    || 0;
 
       await Promise.all([
-        Storage.setSetting('calorieTarget',   daily),
-        Storage.setSetting('targetBreakfast', breakfast),
-        Storage.setSetting('targetLunch',     lunch),
-        Storage.setSetting('targetSnacks',    snacks),
-        Storage.setSetting('targetDinner',    dinner),
+        DB.setSetting('calorieTarget',   daily),
+        DB.setSetting('targetBreakfast', breakfast),
+        DB.setSetting('targetLunch',     lunch),
+        DB.setSetting('targetSnacks',    snacks),
+        DB.setSetting('targetDinner',    dinner),
       ]);
       targets = { daily, breakfast, lunch, snacks, dinner };
       App.showToast('Targets saved!');
@@ -272,7 +272,7 @@
     });
 
     document.getElementById('btn-export-report').addEventListener('click', async () => {
-      const mealLog = await Storage.getMealLogByDate(currentDate);
+      const mealLog = await DB.getMealLogByDate(currentDate);
       App.downloadJSON(`nutritrack-report-${currentDate}.json`, {
         date: currentDate,
         meals: mealLog.meals,

@@ -161,9 +161,9 @@
     </div>
   </div>
 
-  <script src="auth.js?v=2"></script>
-  <script src="storage.js?v=2"></script>
-  <script src="app.js?v=2"></script>
+  <script src="auth.js?v=3"></script>
+  <script src="storage.js?v=3"></script>
+  <script src="app.js?v=3"></script>
   <script>
     let currentDate   = App.todayISO();
     let currentMealLog = null;
@@ -173,7 +173,7 @@
 
     FirebaseAuth.requireAuth().then(async (user) => {
       document.getElementById('nav-user-email').textContent = user.email;
-      allFoods = await Storage.getAllFoods();
+      allFoods = await DB.getAllFoods();
       document.getElementById('meal-date').value = currentDate;
       await loadMealLog();
       setupSearch();
@@ -203,12 +203,12 @@
     }
 
     async function loadMealLog() {
-      currentMealLog = await Storage.getMealLogByDate(currentDate);
+      currentMealLog = await DB.getMealLogByDate(currentDate);
       renderAll();
     }
 
     async function saveMealLog() {
-      await Storage.saveMealLog(currentMealLog);
+      await DB.saveMealLog(currentMealLog);
       renderAll();
     }
 
@@ -221,7 +221,7 @@
       document.getElementById('total-carbs').textContent    = App.fmtNum(daily.carbs, 1);
       document.getElementById('total-fats').textContent     = App.fmtNum(daily.fats, 1);
 
-      Storage.getSetting('calorieTarget').then(target => {
+      DB.getSetting('calorieTarget').then(target => {
         App.renderProgressBar(
           document.getElementById('daily-calorie-bar'),
           daily.calories, Number(target) || 2000, 'Calories'
@@ -286,7 +286,7 @@
     }
 
     async function selectFood(id) {
-      selectedFood = await Storage.getFoodById(id);
+      selectedFood = await DB.getFoodById(id);
       if (!selectedFood) return;
       document.getElementById('food-dropdown').classList.remove('open');
       document.getElementById('food-search').value = selectedFood.name;
@@ -325,7 +325,7 @@
       document.getElementById('btn-confirm-add-food').disabled = true;
       App.openModal('modal-add-food');
       // Refresh food list in case new foods were added in another tab
-      Storage.getAllFoods().then(foods => { allFoods = foods; });
+      DB.getAllFoods().then(foods => { allFoods = foods; });
     }
 
     function closeAddFoodModal() {

@@ -325,7 +325,7 @@ async function saveProfile(profile) {
 // init() is a no-op — Firestore is initialized by auth.js.
 // The same API surface is preserved so existing page code needs minimal changes.
 
-window.Storage = {
+window.DB = {
   init: async () => {},
   // Weight
   addWeightLog, getAllWeightLogs, deleteWeightLog, updateWeightLog,

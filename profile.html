@@ -193,9 +193,9 @@
     </div>
   </main>
 
-  <script src="auth.js?v=2"></script>
-  <script src="storage.js?v=2"></script>
-  <script src="app.js?v=2"></script>
+  <script src="auth.js?v=3"></script>
+  <script src="storage.js?v=3"></script>
+  <script src="app.js?v=3"></script>
   <script>
     let latestWeight = null;
 
@@ -203,8 +203,8 @@
       document.getElementById('nav-user-email').textContent = user.displayName || user.email;
 
       const [profile, weightLogs] = await Promise.all([
-        Storage.getProfile(),
-        Storage.getAllWeightLogs(),
+        DB.getProfile(),
+        DB.getAllWeightLogs(),
       ]);
 
       latestWeight = weightLogs.length ? weightLogs[weightLogs.length - 1].weight : null;
@@ -361,7 +361,7 @@
       btn.textContent = 'Saving…';
 
       try {
-        await Storage.saveProfile(profile);
+        await DB.saveProfile(profile);
 
         // Refresh display
         document.getElementById('nav-user-email').textContent = name || FirebaseAuth.auth.currentUser.email;

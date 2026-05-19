@@ -145,10 +145,10 @@
     </div>
   </div>
 
-  <script src="auth.js?v=2"></script>
-  <script src="storage.js?v=2"></script>
-  <script src="app.js?v=2"></script>
-  <script src="charts.js?v=2"></script>
+  <script src="auth.js?v=3"></script>
+  <script src="storage.js?v=3"></script>
+  <script src="app.js?v=3"></script>
+  <script src="charts.js?v=3"></script>
   <script>
     let allLogs = [];
 
@@ -156,12 +156,12 @@
 
     FirebaseAuth.requireAuth().then(async (user) => {
       document.getElementById('nav-user-email').textContent = user.displayName || user.email;
-      userProfile = await Storage.getProfile();
+      userProfile = await DB.getProfile();
       await loadLogs();
     });
 
     async function loadLogs() {
-      allLogs = await Storage.getAllWeightLogs();
+      allLogs = await DB.getAllWeightLogs();
       renderStats();
       renderChart();
       renderTable();
@@ -260,7 +260,7 @@
 
     async function deleteLog(id) {
       if (!App.confirmAction('Delete this weight entry?')) return;
-      await Storage.deleteWeightLog(id);
+      await DB.deleteWeightLog(id);
       App.showToast('Entry deleted');
       await loadLogs();
     }
@@ -280,10 +280,10 @@
 
       const editId = document.getElementById('weight-edit-id').value;
       if (editId) {
-        await Storage.updateWeightLog({ id: editId, weight: weightVal, date: dateVal, notes: notesVal });
+        await DB.updateWeightLog({ id: editId, weight: weightVal, date: dateVal, notes: notesVal });
         App.showToast('Entry updated');
       } else {
-        await Storage.addWeightLog({ weight: weightVal, date: dateVal, notes: notesVal });
+        await DB.addWeightLog({ weight: weightVal, date: dateVal, notes: notesVal });
         App.showToast('Weight logged!');
       }
 
